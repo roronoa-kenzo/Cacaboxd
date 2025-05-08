@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import ProfileForm from './components/ProfileForm';
 import WebcamAR from './components/WebcamAR';
-import TierList from './components/TierList';
 
 function App() {
   const [step, setStep] = useState(0); // 0: form, 1: webcam, 2: tier list

@@ -5,9 +5,10 @@ import * as faceapi from 'face-api.js';
 export default function WebcamAR({ movies, setStep }) {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
+  const intervalRef = useRef(null); // stocke l'interval
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedMovies, setSelectedMovies] = useState(Array(10).fill(null)); // 10 slots
-  const [currentSlot, setCurrentSlot] = useState(0); // index de 0 à 9
+  const [isStopped, setIsStopped] = useState(false); // nouvel état
 
   useEffect(() => {
     const loadModels = async () => {
@@ -18,14 +19,36 @@ export default function WebcamAR({ movies, setStep }) {
     loadModels();
   }, []);
 
-  // Défilement automatique des posters des film letterboxd
+  // Défilement automatique rapide
   useEffect(() => {
     if (!movies || movies.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentIdx((prev) => (prev + 1) % movies.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [movies]);
+  
+    clearInterval(intervalRef.current);
+  
+    intervalRef.current = setInterval(() => {
+      setCurrentIdx((prevIdx) => {
+        let nextIdx = prevIdx;
+        let tries = 0;
+        const totalMovies = movies.length;
+  
+        do {
+          nextIdx = (nextIdx + 1) % totalMovies;
+          tries++;
+        } while (selectedMovies.includes(movies[nextIdx]) && tries <= totalMovies);
+  
+        if (tries > totalMovies) {
+          clearInterval(intervalRef.current);
+          console.log('Tous les films ont été sélectionnés');
+          return prevIdx; // pas de changement si tous pris
+        }
+  
+        return nextIdx;
+      });
+    }, 300);
+  
+    return () => clearInterval(intervalRef.current);
+  }, [movies, selectedMovies]);
+  
 
   // Détection et dessin sur le front
   const detect = async () => {
@@ -40,17 +63,18 @@ export default function WebcamAR({ movies, setStep }) {
 
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      //faceapi.draw.drawDetections(canvasRef.current, resized);
-      //faceapi.draw.drawFaceLandmarks(canvasRef.current, resized);
+
+      // Désactivé les dessins de faceapi
+      // faceapi.draw.drawDetections(canvasRef.current, resized);
+      // faceapi.draw.drawFaceLandmarks(canvasRef.current, resized);
 
       if (detections && detections.landmarks) {
         const forehead = detections.landmarks.positions[22];
         const img = new Image();
-        img.src = movies[currentIdx]; 
+        img.src = movies[currentIdx];
 
         img.onload = () => {
           ctx.drawImage(img, forehead.x - 60, forehead.y - 160, 110, 140);
-
         };
       }
     }
@@ -62,17 +86,24 @@ export default function WebcamAR({ movies, setStep }) {
     return () => clearInterval(interval);
   });
 
-  // Action quand on clique
-  const handleCapture = () => {
-    if (currentSlot < 10) {
-      const updated = [...selectedMovies];
-      updated[currentSlot] = movies[currentIdx];
-      setSelectedMovies(updated);
-      setCurrentSlot(currentSlot + 1);
-    } else {
-      console.log("Tous les slots sont remplis !");
-      setStep(2);
+  // 👉 Quand on clique sur la webcam (ou canvas), stoppe le défilement
+  const handleStopScrolling = () => {
+    if (!isStopped) { // empêche d'arrêter plusieurs fois
+      clearInterval(intervalRef.current);
+      setIsStopped(true);
+      console.log(`Défilement stoppé sur l'image: ${movies[currentIdx]}`);
     }
+  };
+
+  // 👈 Clique sur une case pour mettre le film choisi
+  const handleCaptureInSlot = (slotIdx) => {
+    if (!isStopped) return; // si pas stoppé, ignore le clic
+    const updated = [...selectedMovies];
+    updated[slotIdx] = movies[currentIdx];
+    setSelectedMovies(updated);
+    console.log(`Film ajouté en case ${slotIdx + 1}: ${movies[currentIdx]}`);
+    setIsStopped(false);
+
   };
 
   return (
@@ -82,6 +113,7 @@ export default function WebcamAR({ movies, setStep }) {
         {Array.from({ length: 10 }).map((_, idx) => (
           <div
             key={idx}
+            onClick={() => handleCaptureInSlot(idx)} // 👈 clique sur la case
             style={{
               width: '80px',
               height: '80px',
@@ -91,7 +123,9 @@ export default function WebcamAR({ movies, setStep }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              position: 'relative'
+              position: 'relative',
+              cursor: isStopped ? 'pointer' : 'not-allowed', // seulement cliquable après arrêt
+              opacity: isStopped ? 1 : 0.5
             }}
           >
             <span
@@ -117,7 +151,7 @@ export default function WebcamAR({ movies, setStep }) {
       </div>
 
       {/* Webcam + canvas */}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }} onClick={handleStopScrolling}>
         <Webcam ref={webcamRef} screenshotFormat="image/jpeg" />
         <canvas
           ref={canvasRef}
@@ -125,9 +159,10 @@ export default function WebcamAR({ movies, setStep }) {
           width={640}
           height={480}
         />
-        <button onClick={handleCapture} style={{ position: 'absolute', bottom: 10, left: 10 }}>
-          Choisir
-        </button>
+        {/* 👉 On a retiré le bouton "Choisir" */}
+        <div style={{ position: 'absolute', bottom: 10, left: 10, color: 'white', background: 'black', padding: '4px' }}>
+          {isStopped ? 'Clique sur une case' : 'Clique pour stopper'}
+        </div>
       </div>
     </div>
   );
