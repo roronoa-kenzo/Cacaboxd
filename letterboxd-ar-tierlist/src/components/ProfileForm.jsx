@@ -1,40 +1,53 @@
 import React, { useState } from 'react';
-import { fetchMovies } from '../api/letterboxdApi';
-import TierList from './TierList';
 import WebcamAR from './WebcamAR';
 
-function ProfileForm() {
+export default function ProfileForm() {
   const [username, setUsername] = useState('');
-  const [movies, setMovies] = useState([]);
-  const [step, setStep] = useState(1); // 1 = Formulaire, 2 = Interface webcam+films
+  const [posters, setPosters] = useState([]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const scrapedMovies = await fetchMovies(username);
-    setMovies(scrapedMovies);
-    setStep(2); // Passer à l'étape 2
+      e.preventDefault();
+      try {
+          const response = await fetch('http://localhost:3000/api/fetchMovies', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username }),
+          });
+          const data = await response.json();
+          setPosters(data);
+      } catch (err) {
+          console.error(err);
+      }
   };
 
-  if (step === 1) {
-    return (
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Ton pseudo Letterboxd"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <button type="submit">Valider</button>
-      </form>
-    );
-  }
-
   return (
-    <div>
-      <WebcamAR />
-      <TierList movies={movies} />
-    </div>
+      <div>
+          <form onSubmit={handleSubmit}>
+              <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Nom d'utilisateur Letterboxd"
+              />
+              <button type="submit">Charger mes films</button>
+          </form>
+
+          {posters.length > 0 && <WebcamAR movies={posters} />}
+
+
+
+          {/*<div className="posters-grid" style={{ display: 'flex', flexWrap: 'wrap', marginTop: '20px' }}>
+              {posters.map((poster, idx) => (
+                  <img
+                      key={idx}
+                      src={poster}
+                      alt="Poster"
+                      style={{ width: '150px', height: '210px', margin: '5px', objectFit: 'cover' }}
+                  />
+              ))}
+          </div>*/}
+      </div>
   );
 }
 
-export default ProfileForm;
+
