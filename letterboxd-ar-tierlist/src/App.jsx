@@ -29,7 +29,7 @@ function App() {
       </main>
 
       <footer style={{ width: '100%', backgroundColor: '#131313', textAlign: 'center', padding: '10px' }}>
-        <small>© 2025 Mon Site</small>
+        <small>Web Design & Development by Tanougast Kenzo</small>
       </footer>
     </div>
   );

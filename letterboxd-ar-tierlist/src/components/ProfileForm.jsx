@@ -35,7 +35,7 @@ export default function ProfileForm() {
             setTimeout(() => setReadyForWebcam(true), 500); // petite pause avant transition
             return 100;
           }
-          return prev + 0.4; // vitesse de chargement
+          return prev + 0.3; // vitesse de chargement
         });
       }, 50);
       return () => clearInterval(interval);
@@ -47,6 +47,34 @@ export default function ProfileForm() {
   }
 
   if (showLoading) {
+
+    let loadingMessage = "Chargement de tes films...";
+    const lowerUsername = username.toLowerCase();
+
+    if (lowerUsername === 'terracid') {
+      loadingMessage = "Salut Patron, me licencier pas ça charge...";
+    } else if (lowerUsername === 'grimkujow') {
+      loadingMessage = "Chargement des films du mec de Zen là...";
+    } else if (lowerUsername === 'potatoze') {
+      loadingMessage = "Chargement des films du raciste la";
+    } else if (lowerUsername === 'regelegorila') {
+      loadingMessage = "Chargement des films sans Kaizen";
+    } else if (lowerUsername === 'hugodelire') {
+      loadingMessage = "Chargement CRAZYYYYYYY des films du GOAT...";
+    } else if (lowerUsername === 'theorus_') {
+      loadingMessage = "Chargement des films du mec qui fait de la 3D la ...";
+    } else if (lowerUsername === 'mnkway') {
+      loadingMessage = "Salut Jean, joue à Kingdom Hearts stp...";
+    } else if (lowerUsername === 'botkz') {
+      loadingMessage = "As salam alaykoum Botkz, c'est le pain d'epice...";
+    } else if (lowerUsername === 'kamet0') {
+      loadingMessage = "MY CEOOOOOOOOOO !";
+    } else if (lowerUsername === 'diegobrando7') {
+      loadingMessage = "Change de pp letterbox par pitié";
+    } else if (lowerUsername === 'hamzakerdaloco') {
+      loadingMessage = "Reviens vers la rue stp Hamza";
+    }
+
     return (
       <div style={{
         display: 'flex',
@@ -55,7 +83,7 @@ export default function ProfileForm() {
         alignItems: 'center',
         color: 'white'
       }}>
-        <h2>Chargement de tes films...</h2>
+        <h2>{loadingMessage}</h2>
         <div style={{
           width: '80%',
           height: '20px',
