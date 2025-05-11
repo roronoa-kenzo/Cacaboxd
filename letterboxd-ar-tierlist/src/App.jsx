@@ -23,6 +23,9 @@ function App() {
         alignItems: 'center',
         padding: '20px'
       }}>
+
+       
+
         {step === 0 && <ProfileForm setMovies={setMovies} setStep={setStep} />}
         {step === 1 && <LoadingScreen onComplete={() => setStep(2)} />}
         {step === 2 && <WebcamAR movies={movies} setSelectedMovie={setSelectedMovie} />}

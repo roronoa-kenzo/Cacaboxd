@@ -10,6 +10,9 @@ function extractProfile(html) {
 async function extractPoster(title) {
     const uri = `https://letterboxd.com/ajax/poster/film/${title}/std/150x210/`;
     const response = await fetch(uri);
+    if (response.status === 404) {
+            throw new Error(`Le profil "${username}" n'existe pas.`);
+        }
     const text = await response.text();
     const $ = cheerio.load(text);
     return $('img').attr('src') || '';
@@ -20,6 +23,9 @@ async function extractReviews(username) {
     for (let i = 1; i <= 10; i++) {
         try {
             const response = await fetch(`https://letterboxd.com/${username}/films/reviews/page/${i}/`);
+            if (response.status === 404) {
+            throw new Error(`Le profil "${username}" n'existe pas.`);
+        }
             const html = await response.text();
             const $ = cheerio.load(html);
             const profile = $('.avatar img').attr('src') || '';
@@ -46,6 +52,9 @@ async function extractReviews(username) {
 
 async function extractFavorites(username) {
     const response = await fetch(`https://letterboxd.com/${username}`);
+    if (response.status === 404) {
+            throw new Error(`Le profil "${username}" n'existe pas.`);
+        }
     if (response.status !== 200) return [];
 
     const html = await response.text();
@@ -68,6 +77,9 @@ async function extractRatings(username) {
     for (let i = 1; i <= 10; i++) {
         try {
             const response = await fetch(`https://letterboxd.com/${username}/films/rated/.5-5/page/${i}/`);
+            if (response.status === 404) {
+            throw new Error(`Le profil "${username}" n'existe pas.`);
+        }
             const html = await response.text();
             const $ = cheerio.load(html);
             const profile = $('.avatar img').attr('src') || '';
@@ -94,6 +106,9 @@ async function extractWatchlist(username) {
     for (let i = 1; i <= 10; i++) {
         try {
             const response = await fetch(`https://letterboxd.com/${username}/watchlist/page/${i}/`);
+            if (response.status === 404) {
+            throw new Error(`Le profil "${username}" n'existe pas.`);
+        }
             const html = await response.text();
             const $ = cheerio.load(html);
             const profile = $('.avatar img').attr('src') || '';
@@ -116,6 +131,9 @@ async function extractWatchlist(username) {
 
 async function extractAverageRating(slug) {
     const response = await fetch(`https://letterboxd.com/film/${slug}/`);
+    if (response.status === 404) {
+            throw new Error(`Le profil "${username}" n'existe pas.`);
+        }
     const html = await response.text();
     const $ = cheerio.load(html);
     const content = $('meta[name="twitter:data2"]').attr('content');
@@ -125,6 +143,37 @@ async function extractAverageRating(slug) {
     return rating;
 }
 
+async function extractListByName(username, listName) {
+    const formattedList = listName.toLowerCase().replace(/\s+/g, '-');
+    const uri = `https://letterboxd.com/${username}/list/${formattedList}/`;
+
+    const response = await fetch(uri);
+
+    if (response.status === 404) {
+        throw new Error(`Le profil ou la liste "${listName}" n'existe pas.`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const films = [];
+    const profile = $('.avatar img').attr('src') || '';
+
+    $('li.poster-container').each((_, element) => {
+        const title = $(element).find('.image').attr('alt') || '';
+        const slug = $(element).find('.linked-film-poster').attr('data-film-slug') || '';
+        films.push({ title, slug, profile });
+    });
+
+    if (films.length < 10) {
+        throw new Error(`La liste "${listName}" contient moins de 10 films.`);
+    }
+
+    const posters = await Promise.all(films.map(film => extractPoster(film.slug)));
+    return posters;
+}
+
+
+
 module.exports = {
     extractProfile,
     extractPoster,
@@ -132,5 +181,6 @@ module.exports = {
     extractFavorites,
     extractRatings,
     extractWatchlist,
-    extractAverageRating
+    extractAverageRating,
+    extractListByName
 };

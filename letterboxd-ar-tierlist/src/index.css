@@ -93,15 +93,15 @@ button:focus-visible {
 }
 
 .profile-form input {
-  margin-bottom: 2em;
-  margin-top: 2em;
-  padding: 12px 16px;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  font-size: 1rem;
-  transition: border 0.2s, box-shadow 0.2s;
-  background-color: white;
-  color: black;
+    margin-bottom: 0em;
+    margin-top: 1em;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: border 0.2s, box-shadow 0.2s;
+    background-color: white;
+    color: black;
 }
 
 .profile-form input:focus {
@@ -111,14 +111,15 @@ button:focus-visible {
 }
 
 .profile-form button {
-  background: #00d543;
-  color: white;
-  border: none;
-  padding: 12px;
-  border-radius: 12px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
+    background: #00d543;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 1em;
 }
 
 .profile-form button:hover {

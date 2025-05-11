@@ -7,23 +7,37 @@ export default function ProfileForm() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showLoading, setShowLoading] = useState(false);
   const [readyForWebcam, setReadyForWebcam] = useState(false);
+  const [listName, setListName] = useState('');
+  const [error, setError] = useState(null);
+
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-     setShowLoading(true);
-    try {
-      const response = await fetch('http://localhost:3000/api/fetchMovies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
-      });
-      const data = await response.json();
-      setPosters(data); // met les films
-      setShowLoading(true); // affiche la barre de chargement
-    } catch (err) {
-      console.error(err);
+  e.preventDefault();
+  setShowLoading(true);
+  setError(null);
+
+  try {
+    const response = await fetch('http://localhost:3000/api/fetchMovies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, listName}),
+    });
+
+    if (!response.ok) {
+      const { error } = await response.json();
+      throw new Error(error || 'Erreur inconnue');
     }
-  };
+
+    const data = await response.json();
+    setPosters(data);
+    setShowLoading(true);
+  } catch (err) {
+    console.error(err);
+    setShowLoading(false);
+    setError(err.message);
+  }
+};
+
 
   // simulate loading progress
   useEffect(() => {
@@ -41,6 +55,10 @@ export default function ProfileForm() {
       return () => clearInterval(interval);
     }
   }, [showLoading]);
+
+  if (error) {
+  setTimeout(() => setError(''), 5000); // Disparaît après 5s
+}
 
   if (readyForWebcam) {
     return <WebcamAR movies={posters} />;
@@ -105,19 +123,46 @@ export default function ProfileForm() {
   }
 
   return (
+    
     <div className="form-container">
+      {error && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#ff4d4f',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+          zIndex: 1000,
+          transition: 'opacity 0.3s ease-in-out',
+          }}>
+          <strong>Erreur :</strong> {error}
+        </div>
+      )}
+
       <div className="logo">
         <img src="/public/img/Cacaboxdlogo.png" alt="Logo" />
         <hr />
       </div>
 
       <form className="profile-form" onSubmit={handleSubmit}>
+        <div className='input-form'>
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Nom d'utilisateur Letterboxd"
+          required
         />
+        <input
+          type="text"
+          value={listName}
+          onChange={(e) => setListName(e.target.value)}
+          placeholder="(Optionnel) Ajoute une liste"
+        />
+        </div>
         <button type="submit">Charger mes films</button>
       </form>
     </div>

@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 
-export default function WebcamAR({ movies, setStep }) {
+export default function WebcamAR({ movies, profile, setStep }) {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const intervalRef = useRef(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedMovies, setSelectedMovies] = useState(Array(10).fill(null));
   const [isStopped, setIsStopped] = useState(false);
+
 
   const VIDEO_WIDTH = 1200;
   const VIDEO_HEIGHT = 1000;
@@ -126,18 +127,56 @@ export default function WebcamAR({ movies, setStep }) {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', marginRight: '20px' }}>
+  <div style={{ display: 'flex', justifyContent: 'center' }}>
+    {profile && (
+  <img 
+    src={profile} 
+    alt="Profile" 
+    style={{
+      position: 'absolute',
+      top: 20,
+      right: 20,
+      width: '60px',
+      height: '60px',
+      borderRadius: '50%',
+      border: '2px solid white',
+      zIndex: 10
+    }}
+  />
+)}
+
+    <div style={{ position: 'relative' }} onClick={handleStopScrolling}>
+      <Webcam
+        ref={webcamRef}
+        screenshotFormat="image/jpeg"
+        width={VIDEO_WIDTH}
+        height={VIDEO_HEIGHT}
+      />
+      <canvas
+        ref={canvasRef}
+        style={{ position: 'absolute', top: 0, left: 0 }}
+        width={VIDEO_WIDTH}
+        height={VIDEO_HEIGHT}
+      />
+
+      {/* Cases affichées dans la webcam */}
+      <div style={{ 
+        position: 'absolute', 
+        top: 70, 
+        left: 50, 
+        display: 'flex', 
+        flexDirection: 'column' 
+      }}>
         {Array.from({ length: 10 }).map((_, idx) => (
           <div
             key={idx}
             onClick={() => handleCaptureInSlot(idx)}
             style={{
               width: '80px',
-              height: '80px',
-              border: '2px solid black',
-              margin: '4px',
-              backgroundColor: 'white',
+              height: '79px',
+              border: '2px solid white',
+              marginBottom: '4px',
+              backgroundColor: 'rgba(255,255,255,0.7)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -151,8 +190,9 @@ export default function WebcamAR({ movies, setStep }) {
                 position: 'absolute',
                 top: 2,
                 left: 2,
-                fontSize: '12px',
-                fontWeight: 'bold'
+                fontSize: '10px',
+                fontWeight: 'bold',
+                color: 'black'
               }}
             >
               {idx + 1}
@@ -166,49 +206,49 @@ export default function WebcamAR({ movies, setStep }) {
             )}
           </div>
         ))}
-        {allSlotsFilled && (
-          <button
-            onClick={handleRejouer}
-            style={{ marginTop: '10px', padding: '6px 12px' }}
-          >
-            Rejouer
-          </button>
-        )}
       </div>
 
-      <div style={{ position: 'relative' }} onClick={handleStopScrolling}>
-        <Webcam
-          ref={webcamRef}
-          screenshotFormat="image/jpeg"
-          width={VIDEO_WIDTH}
-          height={VIDEO_HEIGHT}
-        />
-        <canvas
-          ref={canvasRef}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-          width={VIDEO_WIDTH}
-          height={VIDEO_HEIGHT}
-        />
-        <div style={{ position: 'absolute', bottom: 10, left: 10, color: 'white', background: 'black', padding: '4px' }}>
-          {isStopped ? 'Clique sur une case ou relancer' : 'Clique pour stopper'}
-        </div>
+      {/* Message en bas à gauche */}
+      <div style={{ position: 'absolute', bottom: 10, left: 10, color: 'white', background: 'black', padding: '4px' }}>
+        {isStopped ? 'Clique sur une case ou relancer' : 'Clique pour stopper'}
+      </div>
+
+      {/* Bouton relancer */}
+      <button
+        onClick={handleRelancer}
+        disabled={!isStopped}
+        style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          padding: '6px 12px',
+          backgroundColor: isStopped ? 'white' : 'gray',
+          color: isStopped ? 'black' : 'lightgray',
+          border: '1px solid black',
+          cursor: isStopped ? 'pointer' : 'not-allowed'
+        }}
+      >
+        Relancer
+      </button>
+
+      {/* Bouton Rejouer si tout est rempli */}
+      {allSlotsFilled && (
         <button
-          onClick={handleRelancer}
-          disabled={!isStopped}
+          onClick={handleRejouer}
           style={{
             position: 'absolute',
-            bottom: 10,
+            top: 10,
             right: 10,
             padding: '6px 12px',
-            backgroundColor: isStopped ? 'white' : 'gray',
-            color: isStopped ? 'black' : 'lightgray',
-            border: '1px solid black',
-            cursor: isStopped ? 'pointer' : 'not-allowed'
+            backgroundColor: 'white',
+            color: 'black',
+            border: '1px solid black'
           }}
         >
-          Relancer
+          Rejouer
         </button>
-      </div>
+      )}
     </div>
-  );
+  </div>
+);
 }

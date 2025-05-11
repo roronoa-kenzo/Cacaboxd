@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { extractFavorites, extractReviews, extractRatings, extractWatchlist } = require('./scraper.cjs');
+const { extractFavorites, extractReviews, extractRatings, extractWatchlist, extractListByName } = require('./scraper.cjs');
  // utilise la fonction du scraper
 
 const app = express();
@@ -9,41 +9,39 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.post('/api/fetchMovies', async (req, res) => {
-    const { username } = req.body;
+    const { username, listName} = req.body;
+
     try {
-        const favorites = await extractFavorites(username);
-        const ratings = await extractRatings(username);
-        const reviews = await extractReviews(username);
+        let posters;
+        if (listName) {
+            posters = await extractListByName(username, listName);
+        } else {
+            const favorites = await extractFavorites(username, profile);
+            const ratings = await extractRatings(username, profile);
+            const reviews = await extractReviews(username, profile);
 
-        //fusionne tout en un seul tableau
-        const allPosters = [
-            ...favorites.map(f => f.poster),
-            ...ratings.map(r => r.poster),
-            ...reviews.map(r => r.poster)
-        ].filter(p => p); // enlève les vides/null
+            posters = [
+                ...favorites.map(f => f.poster),
+                ...ratings.map(r => r.poster),
+                ...reviews.map(r => r.poster)
+            ].filter(p => p);
+        }
 
-        res.json(allPosters);
+        if (!posters.length) {
+            throw new Error(listName 
+              ? `Aucun film trouvé dans la liste "${listName}" de ${username}` 
+              : `Aucun film trouvé pour l'utilisateur ${username}`);
+        }
+
+        res.json(posters);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Erreur serveur' });
+        res.status(404).json({ error: err.message });
     }
 });
 
-app.post('/api/fetchAll', async (req, res) => {
-  const { username } = req.body;
-  try {
-      const [favorites, reviews, ratings, watchlist] = await Promise.all([
-          extractFavorites(username),
-          extractReviews(username),
-          extractRatings(username),
-          extractWatchlist(username),
-      ]);
-      res.json({ favorites, reviews, ratings, watchlist });
-  } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Erreur lors de la récupération des films' });
-  }
-});
+
+
 
 
 app.listen(3000, () => console.log('Backend running on http://localhost:3000'));
