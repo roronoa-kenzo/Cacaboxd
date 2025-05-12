@@ -12,7 +12,7 @@ function App() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <header style={{ width: '100%', backgroundColor: '#14181c', color: 'red', padding: '20px 0' }}>
         <nav style={{ maxWidth: '1200px', margin: '10px auto', padding: '0 20px' }}>
-          <img style={{ padding: '0 30px', height: '40px' }} src="/public/img/Cacaboxdlogo.png" alt="Cacaboxd" />
+          <img style={{ padding: '0 30px', height: '40px' }} src="/img/Cacaboxdlogo.png" alt="Cacaboxd" />
         </nav>
       </header>
 

@@ -143,7 +143,7 @@ export default function ProfileForm() {
       )}
 
       <div className="logo">
-        <img src="/public/img/Cacaboxdlogo.png" alt="Logo" />
+        <img src="/img/Cacaboxdlogo.png" alt="Logo" />
         <hr />
       </div>
 
