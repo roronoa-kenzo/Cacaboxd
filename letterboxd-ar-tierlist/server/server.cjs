@@ -16,9 +16,9 @@ app.post('/api/fetchMovies', async (req, res) => {
         if (listName) {
             posters = await extractListByName(username, listName);
         } else {
-            const favorites = await extractFavorites(username, profile);
-            const ratings = await extractRatings(username, profile);
-            const reviews = await extractReviews(username, profile);
+            const favorites = await extractFavorites(username);
+            const ratings = await extractRatings(username);
+            const reviews = await extractReviews(username);
 
             posters = [
                 ...favorites.map(f => f.poster),

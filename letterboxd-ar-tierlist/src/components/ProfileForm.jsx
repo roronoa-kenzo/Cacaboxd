@@ -74,7 +74,7 @@ export default function ProfileForm() {
     } else if (lowerUsername === 'grimkujow') {
       loadingMessage = "Chargement des films du mec de Zen là...";
     } else if (lowerUsername === 'potatoze') {
-      loadingMessage = "Chargement des films du raciste la";
+      loadingMessage = "Salut Pota, Chargement de tes films..";
     } else if (lowerUsername === 'regelegorila') {
       loadingMessage = "Chargement des films sans Kaizen";
     } else if (lowerUsername === 'hugodelire') {

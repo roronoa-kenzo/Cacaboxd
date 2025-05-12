@@ -156,12 +156,12 @@ async function extractListByName(username, listName) {
     const html = await response.text();
     const $ = cheerio.load(html);
     const films = [];
-    const profile = $('.avatar img').attr('src') || '';
+  
 
     $('li.poster-container').each((_, element) => {
         const title = $(element).find('.image').attr('alt') || '';
         const slug = $(element).find('.linked-film-poster').attr('data-film-slug') || '';
-        films.push({ title, slug, profile });
+        films.push({ title, slug});
     });
 
     if (films.length < 10) {
