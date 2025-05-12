@@ -70,7 +70,7 @@ export default function ProfileForm() {
     const lowerUsername = username.toLowerCase();
 
     if (lowerUsername === 'terracid') {
-      loadingMessage = "Salut Patron, me licencier pas ça charge...";
+      loadingMessage = "Salut Patron, optimisation de vos films et de vos impôts...";
     } else if (lowerUsername === 'grimkujow') {
       loadingMessage = "Chargement des films du mec de Zen là...";
     } else if (lowerUsername === 'potatoze') {
@@ -78,7 +78,7 @@ export default function ProfileForm() {
     } else if (lowerUsername === 'regelegorila') {
       loadingMessage = "Chargement des films sans Kaizen";
     } else if (lowerUsername === 'hugodelire') {
-      loadingMessage = "Chargement CRAZYYYYYYY des films du GOAT...";
+      loadingMessage = "Chargement CRAZYYYYYYY des films du GOAT de la CCB...";
     } else if (lowerUsername === 'theorus_') {
       loadingMessage = "Chargement des films du mec qui fait de la 3D la ...";
     } else if (lowerUsername === 'mnkway') {

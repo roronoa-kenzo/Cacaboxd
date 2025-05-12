@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
+
 export default function WebcamAR({ movies, setStep }) {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
@@ -15,6 +16,7 @@ export default function WebcamAR({ movies, setStep }) {
     bracket: Array(15).fill(null) // 8 films require 15 slots for a complete tournament bracket
   });
   const [headPosition, setHeadPosition] = useState('center'); // 'left', 'center', or 'right'
+  const [headTiltDegree, setHeadTiltDegree] = useState(0); // Niveau d'inclinaison -100 à 100 
   const headPositionRef = useRef('center');
   const lastSelectionTime = useRef(0);
   const selectionCooldown = 2000; // 2 secondes de cooldown entre les sélections
@@ -25,6 +27,10 @@ export default function WebcamAR({ movies, setStep }) {
   const allSlotsFilled = selectedMovies.every((slot) => slot !== null);
   // Tournament is completed when we have a winner in position 14 (the final position)
   const tournamentCompleted = tournamentMovies.bracket[14] !== null;
+
+  // Seuils pour les niveaux d'inclinaison
+  const SLIGHT_TILT_THRESHOLD = 10; // Seuil pour l'effet visuel
+  const SELECTION_TILT_THRESHOLD = 20; // Seuil pour la sélection définitive
 
   useEffect(() => {
     const loadModels = async () => {
@@ -125,42 +131,43 @@ export default function WebcamAR({ movies, setStep }) {
         const headAngle = Math.atan2(normalizedEyesVector.y, normalizedEyesVector.x);
         const headAngleDegrees = headAngle * (180 / Math.PI);
         
+        // Quantifier le degré d'inclinaison de -100 (extrême gauche) à +100 (extrême droite)
+        let tiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
+        setHeadTiltDegree(tiltFactor);
+        
         // Détermine la position de la tête basée sur l'angle
         let newHeadPosition = 'center';
-        const ANGLE_THRESHOLD = 15; // Seuil d'angle pour détecter l'inclinaison de la tête
         
-        if (headAngleDegrees > ANGLE_THRESHOLD) {
-          newHeadPosition = 'left';
-        } else if (headAngleDegrees < -ANGLE_THRESHOLD) {
-          newHeadPosition = 'right';
-        } else {
+        if (Math.abs(headAngleDegrees) < SLIGHT_TILT_THRESHOLD) {
           newHeadPosition = 'center';
+        } else if (headAngleDegrees > 0) {
+          newHeadPosition = 'left'; // La webcam est inversée donc positif = gauche
+        } else {
+          newHeadPosition = 'right'; // La webcam est inversée donc négatif = droite
         }
         
         // Mise à jour de la position de la tête
         if (newHeadPosition !== headPositionRef.current) {
           headPositionRef.current = newHeadPosition;
           setHeadPosition(newHeadPosition);
-          
-          // Vérification si on est en mode tournoi et si un film doit être sélectionné
-          if (filterType === 'tournament' && 
-              !tournamentCompleted && 
-              tournamentMovies.current && 
-              tournamentMovies.opponent &&
-              (newHeadPosition === 'left' || newHeadPosition === 'right') &&
-              Date.now() - lastSelectionTime.current > selectionCooldown) {
-            
-            // Sélectionner un film basé sur l'inclinaison de la tête
-            const isLeftWinner = newHeadPosition === 'right'; // Inversé car la webcam est inversée
-            handleSelectTournamentWinner(isLeftWinner);
-            lastSelectionTime.current = Date.now();
-          }
         }
+        
+        // Vérification pour la sélection définitive uniquement si l'angle dépasse le seuil de sélection
+        if (filterType === 'tournament' && 
+    !tournamentCompleted && 
+    tournamentMovies.current && 
+    tournamentMovies.opponent &&
+    Math.abs(headAngleDegrees) > SELECTION_TILT_THRESHOLD &&
+    Date.now() - lastSelectionTime.current > selectionCooldown) {
+  
+  // CORRECTION ICI: Inverser la logique de sélection
+  const isLeftWinner = headAngleDegrees > 0; // Quand on penche à gauche (valeur négative), sélectionner le film de gauche
+  handleSelectTournamentWinner(isLeftWinner);
+  lastSelectionTime.current = Date.now();
+}
         
         const scaleX = VIDEO_WIDTH / 640;
         const scaleY = VIDEO_HEIGHT / 480;
-        
-        
         
         if (filterType === 'grid') {
           // Original filter - show one movie on forehead
@@ -169,13 +176,14 @@ export default function WebcamAR({ movies, setStep }) {
 
           img.onload = () => {
             ctx.drawImage(
-              img,
-              forehead.x - -105 * scaleX,
-              forehead.y - 20 * scaleY,
-              110 * scaleX,
-              140 * scaleY
+            img,
+            VIDEO_WIDTH - forehead.x - 180 * scaleX, // <- Inversion horizontale
+            forehead.y - 30 * scaleY,
+            110 * scaleX,
+            140 * scaleY
             );
           };
+          
         } else if (filterType === 'tournament') {
           // Tournament filter - show two movies facing off
           if (tournamentMovies.current && tournamentMovies.opponent) {
@@ -184,28 +192,82 @@ export default function WebcamAR({ movies, setStep }) {
             
             const imgRight = new Image();
             imgRight.src = tournamentMovies.opponent;
-            
+            let imagesLoaded = 0;
             const vsText = "VS";
             
-            imgLeft.onload = () => {
-              // Left movie
+            imgLeft.onload = imgRight.onload = () => {
+              imagesLoaded++;
+              
+              // Constantes pour le dessin des images
+              const baseImgWidth = 110 * scaleX;
+              const baseImgHeight = 140 * scaleY;
+              const baseLeftX = forehead.x - -200 * scaleX;
+              const baseRightX = forehead.x + -10 * scaleX;
+              const baseY = forehead.y - 50 * scaleY;
+              
+              // Effet de penchement en temps réel basé sur l'inclinaison de la tête
+              // L'effet est proportionnel au degré d'inclinaison
+              
+              // Normaliser le tiltFactor pour en faire un pourcentage
+              const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor)); // 0 à 100 (positif = penchement à gauche)
+              const normalizedRightTilt = Math.max(0, tiltFactor); // 0 à 100 (négatif = penchement à droite)
+              
+              // Calculer l'échelle et rotation en fonction de l'inclinaison
+              // Maximums: 1.2x scale et 10 degrés de rotation
+              const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
+              const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
+              
+              const leftRotation = (normalizedLeftTilt / 100) * 10; // 0-10 degrés
+              const rightRotation = -(normalizedRightTilt / 100) * 10; // 0-10 degrés  
+              
+              // Calculer les dimensions et positions finales
+              const leftImgWidth = baseImgWidth * leftScale;
+              const leftImgHeight = baseImgHeight * leftScale;
+              const rightImgWidth = baseImgWidth * rightScale;
+              const rightImgHeight = baseImgHeight * rightScale;
+              
+              // Ajuster les positions pour que les agrandissements soient centrés
+              const leftX = baseLeftX - (leftImgWidth - baseImgWidth) / 2;
+              const leftY = baseY - (leftImgHeight - baseImgHeight) / 2;
+              const rightX = baseRightX - (rightImgWidth - baseImgWidth) / 2;
+              const rightY = baseY - (rightImgHeight - baseImgHeight) / 2;
+              
+              // Dessiner l'image de gauche avec rotation
+              ctx.save();
+              // Définir le point de pivot au centre de l'image
+              const leftPivotX = leftX + leftImgWidth / 2;
+              const leftPivotY = leftY + leftImgHeight / 2;
+              ctx.translate(leftPivotX, leftPivotY);
+              ctx.rotate(leftRotation * Math.PI / 180);
               ctx.drawImage(
                 imgLeft,
-                forehead.x - -200 * scaleX,
-                forehead.y - 50 * scaleY,
-                110 * scaleX,
-                140 * scaleY
+                -leftImgWidth / 2, // Ajuster pour le pivot
+                -leftImgHeight / 2, // Ajuster pour le pivot
+                leftImgWidth,
+                leftImgHeight
               );
+              ctx.restore();
+              
+              // Dessiner l'image de droite avec rotation
+              ctx.save();
+              // Définir le point de pivot au centre de l'image
+              const rightPivotX = rightX + rightImgWidth / 2;
+              const rightPivotY = rightY + rightImgHeight / 2;
+              ctx.translate(rightPivotX, rightPivotY);
+              ctx.rotate(rightRotation * Math.PI / 180);
+              ctx.drawImage(
+                imgRight,
+                -rightImgWidth / 2, // Ajuster pour le pivot
+                -rightImgHeight / 2, // Ajuster pour le pivot
+                rightImgWidth,
+                rightImgHeight
+              );
+              ctx.restore();
               
               // Position du VS exactement au milieu entre les deux images
-              // Calcul des positions des images
-              const leftImageX = forehead.x - -200 * scaleX;  // Position X de l'image gauche
-              const rightImageX = forehead.x + -10 * scaleX;  // Position X de l'image droite
-              const imageWidth = 110 * scaleX;               // Largeur des images
-              
-              // Calcul du point central entre les deux images
-              const leftImageCenter = leftImageX + imageWidth / 2;
-              const rightImageCenter = rightImageX + imageWidth / 2;
+              // Calcul des positions des images pour le texte VS
+              const leftImageCenter = leftX + leftImgWidth / 2;
+              const rightImageCenter = rightX + rightImgWidth / 2;
               const middlePoint = (leftImageCenter + rightImageCenter) / 2;
               
               // Rendu du texte VS au milieu
@@ -214,17 +276,40 @@ export default function WebcamAR({ movies, setStep }) {
               ctx.strokeStyle = 'black';
               ctx.lineWidth = 2;
               ctx.textAlign = 'center';
-           
               ctx.fillText(vsText, middlePoint, forehead.y - -30 * scaleY);
               
-              // Right movie
-              ctx.drawImage(
-                imgRight,
-                forehead.x + -10 * scaleX,
-                forehead.y - 50 * scaleY,
-                110 * scaleX,
-                140 * scaleY
-              );
+              // Afficher les indicateurs visuels de sélection potentielle
+              if (Math.abs(tiltFactor) > SLIGHT_TILT_THRESHOLD * 5) {
+                // Choisir la couleur en fonction de l'inclinaison
+                let indicatorColor;
+                let indicatorX;
+                let indicatorText;
+                
+                
+                
+                // Dessiner un cercle autour du film sélectionné
+                ctx.beginPath();
+                ctx.arc(
+                  indicatorX, 
+                  forehead.y - 30 * scaleY, 
+                  Math.max(leftImgWidth, rightImgWidth) / 1.6, 
+                  0, 
+                  2 * Math.PI
+                );
+                ctx.strokeStyle = indicatorColor;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                
+                // Texte d'indication
+                ctx.font = `bold ${22 * scaleX}px Arial`;
+                ctx.fillStyle = indicatorColor;
+                ctx.textAlign = 'center';
+                ctx.fillText(
+                  indicatorText, 
+                  indicatorX, 
+                  forehead.y - 100 * scaleY
+                );
+              }
             };
           }
         }
@@ -259,7 +344,7 @@ export default function WebcamAR({ movies, setStep }) {
 
   const handleSelectTournamentWinner = (isLeftWinner) => {
     const bracketCopy = [...tournamentMovies.bracket];
-    const winner = isLeftWinner ? tournamentMovies.current : tournamentMovies.opponent;
+    const winner = isLeftWinner ? tournamentMovies.opponent : tournamentMovies.current;
     
     // Track which phase of the tournament we're in
     const filledInitialSlots = bracketCopy.slice(0, 8).filter(slot => slot !== null).length;
@@ -469,51 +554,57 @@ export default function WebcamAR({ movies, setStep }) {
 
         {filterType === 'grid' && (
           <>
-            {/* Original Grid Cases */}
+            {/* Modified Grid Cases - Numbers on the left side of the boxes */}
             <div style={{ 
               position: 'absolute', 
-              top: 70, 
+              top: 60, 
               left: 50, 
               display: 'flex', 
               flexDirection: 'column' 
             }}>
               {Array.from({ length: 10 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handleCaptureInSlot(idx)}
-                  style={{
-                    width: '80px',
-                    height: '79px',
-                    border: '2px solid white',
-                    marginBottom: '4px',
-                    backgroundColor: 'rgba(255,255,255,0.7)',
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: '7px' }}>
+                  {/* Number on the left side */}
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    position: 'relative',
-                    cursor: isStopped ? 'pointer' : 'not-allowed',
-                    opacity: isStopped ? 1 : 0.5
-                  }}
-                >
-                  <span
+                    marginRight: '5px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    borderRadius: '50%'
+                  }}>
+                    {idx + 1}
+                  </div>
+                  
+                  {/* Movie box */}
+                  <div
+                    onClick={() => handleCaptureInSlot(idx)}
                     style={{
-                      position: 'absolute',
-                      top: 2,
-                      left: 2,
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                      color: 'black'
+                      width: '80px',
+                      height: '79px',
+                      border: '1px solid white',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(255,255,255,0.7)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      cursor: isStopped ? 'pointer' : 'not-allowed',
+                      opacity: isStopped ? 1 : 0.5
                     }}
                   >
-                    {idx + 1}
-                  </span>
-                  {selectedMovies[idx] && (
-                    <img
-                      src={selectedMovies[idx]}
-                      alt={`film-${idx}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  )}
+                    {selectedMovies[idx] && (
+                      <img
+                        src={selectedMovies[idx]}
+                        alt={`film-${idx}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }}
+                      />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -565,6 +656,7 @@ export default function WebcamAR({ movies, setStep }) {
             left: '20%',
             top: `${10 + idx * 20}%`,
             border: '2px solid #666',
+            borderRadius: '10px',
             backgroundColor: 'white',
             overflow: 'hidden'
           }}>
@@ -590,6 +682,7 @@ export default function WebcamAR({ movies, setStep }) {
             right: '70%',
             top: `${10 + idx * 20}%`,
             border: '2px solid #666',
+            borderRadius: '10px',
             backgroundColor: 'white',
             overflow: 'hidden'
           }}>
@@ -614,6 +707,7 @@ export default function WebcamAR({ movies, setStep }) {
           left: idx < 2 ? '17%' : '60%',
           top: `${20 + (idx % 2) * 40}%`,
           border: '2px solid #666',
+          borderRadius: '10px',
           backgroundColor: 'white',
           overflow: 'hidden'
         }}>
@@ -630,6 +724,7 @@ export default function WebcamAR({ movies, setStep }) {
           left: `${26 + idx * 26}%`,
           top: '41%',
           border: '2px solid #666',
+          borderRadius: '10px',
           backgroundColor: 'white',
           overflow: 'hidden'
         }}>
@@ -647,6 +742,7 @@ export default function WebcamAR({ movies, setStep }) {
           width: '130px',
           height: '140px',
           border: '4px solid gold',
+          borderRadius: '10px',
           backgroundColor: 'white',
           overflow: 'hidden',
           zIndex: 10
@@ -675,7 +771,7 @@ export default function WebcamAR({ movies, setStep }) {
 
     {/* Tournament instructions and status */}
     <div style={{ 
-      position: 'absolute', 
+      position: 'absolute',
       top: 50, 
       left: 0,
       right: 0,
