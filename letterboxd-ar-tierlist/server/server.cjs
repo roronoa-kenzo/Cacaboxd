@@ -49,4 +49,4 @@ app.post('/api/fetchMovies', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.SERVER_HOST || 'localhost';
 
-app.listen(PORT, () => console.log(`Backend running on http://${HOST}:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Backend running on http://${HOST}:${PORT}`));
