@@ -7,10 +7,8 @@ const { extractFavorites, extractReviews, extractRatings, extractWatchlist, extr
 
 const app = express();
 
-// Configuration CORS avec les origines autorisées
-app.use(cors({
-  origin: process.env.CORS_ALLOWED_ORIGINS.split(',')
-}));
+// Utiliser cors avec configuration par défaut au lieu de split() sur une valeur undefined
+app.use(cors());
 app.use(bodyParser.json());
 
 app.post('/api/fetchMovies', async (req, res) => {
@@ -46,6 +44,6 @@ app.post('/api/fetchMovies', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.SERVER_HOST || 'localhost';
 
+// Écouter sur toutes les interfaces
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend running on http://0.0.0.0:${PORT}`));
