@@ -14,7 +14,6 @@ app.use(cors({
 app.use(bodyParser.json());
 
 app.post('/api/fetchMovies', async (req, res) => {
-    console.log("API URL utilisée:", import.meta.env.VITE_API_URL);
     const { username, listName} = req.body;
 
     try {
