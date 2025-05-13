@@ -1,11 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+require('dotenv').config();
 const { extractFavorites, extractReviews, extractRatings, extractWatchlist, extractListByName } = require('./scraper.cjs');
  // utilise la fonction du scraper
 
 const app = express();
-app.use(cors());
+
+// Configuration CORS avec les origines autorisées
+app.use(cors({
+  origin: process.env.CORS_ALLOWED_ORIGINS.split(',')
+}));
 app.use(bodyParser.json());
 
 app.post('/api/fetchMovies', async (req, res) => {
@@ -40,8 +45,7 @@ app.post('/api/fetchMovies', async (req, res) => {
     }
 });
 
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.SERVER_HOST || 'localhost';
 
-
-
-
-app.listen(3000, () => console.log('Backend running on http://31.56.58.171/'));
+app.listen(PORT, () => console.log(`Backend running on http://${HOST}:${PORT}`));
