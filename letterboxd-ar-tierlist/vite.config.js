@@ -1,14 +1,20 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  const isProduction = mode === 'production';
+  
   return {
     plugins: [react()],
-    define: {
-      'process.env': {
-        NODE_ENV: JSON.stringify(mode)
-      }
+    server: {
+      // Proxy API requests to the backend during development
+      proxy: !isProduction ? {
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        }
+      } : undefined
     }
-  }
-})
+  };
+});

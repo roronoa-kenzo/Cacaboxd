@@ -10,34 +10,43 @@ export default function ProfileForm() {
   const [listName, setListName] = useState('');
   const [error, setError] = useState(null);
 
-  const API_URL = 'http://localhost:3000/api/fetchMovies';
+  const API_URL = import.meta.env.VITE_API_URL || '/api/fetchMovies';
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setShowLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, listName }),
-      });
-
-      if (!response.ok) {
-        const { error } = await response.json();
-        throw new Error(error || 'Erreur inconnue');
-      }
-
-      const data = await response.json();
-      setPosters(data);
-      setShowLoading(true);
-    } catch (err) {
-      console.error(err);
-      setShowLoading(false);
-      setError(err.message);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setShowLoading(true);
+  setError(null);
+  
+  console.log(`Attempting to fetch from: ${API_URL}`);
+  
+  try {
+    console.log('Request payload:', { username, listName });
+    
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, listName }),
+    });
+    
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries([...response.headers]));
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error response:', errorData);
+      throw new Error(errorData.error || 'Erreur inconnue');
     }
-  };
+
+    const data = await response.json();
+    console.log(`Received ${data.length} posters`);
+    setPosters(data);
+    setShowLoading(true);
+  } catch (err) {
+    console.error('Fetch error details:', err);
+    setShowLoading(false);
+    setError(err.message);
+  }
+};
 
   // simulate loading progress
   useEffect(() => {
