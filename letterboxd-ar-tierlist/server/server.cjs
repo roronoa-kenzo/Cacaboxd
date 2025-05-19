@@ -6,24 +6,17 @@ const { extractFavorites, extractReviews, extractRatings, extractWatchlist, extr
 
 const app = express();
 
-// Correctly configure CORS using environment variables
-const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS 
-  ? process.env.CORS_ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:5173', 'http://31.56.58.171', 'http://localhost'];
-
+// Configuration CORS simplifiée - autorise toutes les origines
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: true,  // Autorise toutes les origines
   credentials: true
 }));
+
+// Middleware pour logger l'origine des requêtes (pour le débogage)
+app.use((req, res, next) => {
+  console.log('Request origin:', req.headers.origin);
+  next();
+});
 
 app.use(bodyParser.json());
 
@@ -78,6 +71,11 @@ app.post('/api/fetchMovies', async (req, res) => {
 // Add a basic route to test if the server is running
 app.get('/', (req, res) => {
   res.send('Server is running correctly');
+});
+
+// Add a test route for CORS verification
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'CORS is working correctly' });
 });
 
 const PORT = process.env.PORT || 3000;
