@@ -17,12 +17,13 @@ export default function WebcamAR({ movies, setStep }) {
   });
   const [headPosition, setHeadPosition] = useState('center'); // 'left', 'center', or 'right'
   const [headTiltDegree, setHeadTiltDegree] = useState(0); // Niveau d'inclinaison -100 à 100 
+  const [loadedImages, setLoadedImages] = useState({});
   const headPositionRef = useRef('center');
   const lastSelectionTime = useRef(0);
   const selectionCooldown = 2000; // 2 secondes de cooldown entre les sélections
 
-  const VIDEO_WIDTH = 1200;
-  const VIDEO_HEIGHT = 1000;
+  const VIDEO_WIDTH = 1920;
+  const VIDEO_HEIGHT = 1080;
 
   const allSlotsFilled = selectedMovies.every((slot) => slot !== null);
   // Tournament is completed when we have a winner in position 14 (the final position)
@@ -166,8 +167,8 @@ export default function WebcamAR({ movies, setStep }) {
   lastSelectionTime.current = Date.now();
 }
         
-        const scaleX = VIDEO_WIDTH / 640;
-        const scaleY = VIDEO_HEIGHT / 480;
+        const scaleX = VIDEO_WIDTH / 900;
+        const scaleY = VIDEO_HEIGHT / 450;
         
         if (filterType === 'grid') {
           // Original filter - show one movie on forehead
@@ -177,61 +178,82 @@ export default function WebcamAR({ movies, setStep }) {
           img.onload = () => {
             ctx.drawImage(
             img,
-            VIDEO_WIDTH - forehead.x - 180 * scaleX, // <- Inversion horizontale
-            forehead.y - 30 * scaleY,
+            VIDEO_WIDTH - forehead.x - 40 * scaleX, // <- Inversion horizontale
+            forehead.y - 160 * scaleY,
             110 * scaleX,
             140 * scaleY
             );
           };
           
+        
+
+        // Puis modifiez la partie de rendu des images dans la fonction detect()
+        // Localisez le bloc où le tournoi est rendu (environ ligne 359) et remplacez par:
+
         } else if (filterType === 'tournament') {
           // Tournament filter - show two movies facing off
           if (tournamentMovies.current && tournamentMovies.opponent) {
-            const imgLeft = new Image();
-            imgLeft.src = tournamentMovies.current;
-            
-            const imgRight = new Image();
-            imgRight.src = tournamentMovies.opponent;
-            let imagesLoaded = 0;
+            // Vérifier si les images sont déjà chargées
+            if (!loadedImages[tournamentMovies.current]) {
+              const imgLeft = new Image();
+              imgLeft.src = tournamentMovies.current;
+              imgLeft.onload = () => {
+                setLoadedImages(prev => ({
+                  ...prev,
+                  [tournamentMovies.current]: imgLeft
+                }));
+              };
+            }
+    
+            if (!loadedImages[tournamentMovies.opponent]) {
+              const imgRight = new Image();
+              imgRight.src = tournamentMovies.opponent;
+              imgRight.onload = () => {
+                setLoadedImages(prev => ({
+                  ...prev,
+                  [tournamentMovies.opponent]: imgRight
+                }));
+              };
+            }
+    
+            const imgLeft = loadedImages[tournamentMovies.current];
+            const imgRight = loadedImages[tournamentMovies.opponent];
             const vsText = "VS";
-            
-            imgLeft.onload = imgRight.onload = () => {
-              imagesLoaded++;
-              
+    
+            if (imgLeft && imgRight) {
               // Constantes pour le dessin des images
-              const baseImgWidth = 110 * scaleX;
-              const baseImgHeight = 140 * scaleY;
-              const baseLeftX = forehead.x - -200 * scaleX;
-              const baseRightX = forehead.x + -10 * scaleX;
-              const baseY = forehead.y - 50 * scaleY;
-              
+              const baseImgWidth = 100 * scaleX;
+              const baseImgHeight = 150 * scaleY;
+              const baseLeftX = forehead.x - -70 * scaleX;
+              const baseRightX = forehead.x + -130 * scaleX;
+              const baseY = forehead.y - 180 * scaleY;
+      
               // Effet de penchement en temps réel basé sur l'inclinaison de la tête
               // L'effet est proportionnel au degré d'inclinaison
-              
+      
               // Normaliser le tiltFactor pour en faire un pourcentage
-              const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor)); // 0 à 100 (positif = penchement à gauche)
-              const normalizedRightTilt = Math.max(0, tiltFactor); // 0 à 100 (négatif = penchement à droite)
-              
+              const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor)); 
+              const normalizedRightTilt = Math.max(0, tiltFactor);
+      
               // Calculer l'échelle et rotation en fonction de l'inclinaison
-              // Maximums: 1.2x scale et 10 degrés de rotation
               const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
               const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
-              
-              const leftRotation = (normalizedLeftTilt / 100) * 10; // 0-10 degrés
-              const rightRotation = -(normalizedRightTilt / 100) * 10; // 0-10 degrés  
-              
+      
+              const leftRotation = (normalizedLeftTilt / 100) * 10;
+              const rightRotation = -(normalizedRightTilt / 100) * 10;
+      
               // Calculer les dimensions et positions finales
               const leftImgWidth = baseImgWidth * leftScale;
               const leftImgHeight = baseImgHeight * leftScale;
               const rightImgWidth = baseImgWidth * rightScale;
               const rightImgHeight = baseImgHeight * rightScale;
-              
+      
               // Ajuster les positions pour que les agrandissements soient centrés
               const leftX = baseLeftX - (leftImgWidth - baseImgWidth) / 2;
               const leftY = baseY - (leftImgHeight - baseImgHeight) / 2;
               const rightX = baseRightX - (rightImgWidth - baseImgWidth) / 2;
               const rightY = baseY - (rightImgHeight - baseImgHeight) / 2;
-              
+      
               // Dessiner l'image de gauche avec rotation
               ctx.save();
               // Définir le point de pivot au centre de l'image
@@ -241,13 +263,13 @@ export default function WebcamAR({ movies, setStep }) {
               ctx.rotate(leftRotation * Math.PI / 180);
               ctx.drawImage(
                 imgLeft,
-                -leftImgWidth / 2, // Ajuster pour le pivot
-                -leftImgHeight / 2, // Ajuster pour le pivot
+                -leftImgWidth / 2,
+                -leftImgHeight / 2,
                 leftImgWidth,
                 leftImgHeight
               );
               ctx.restore();
-              
+      
               // Dessiner l'image de droite avec rotation
               ctx.save();
               // Définir le point de pivot au centre de l'image
@@ -257,67 +279,45 @@ export default function WebcamAR({ movies, setStep }) {
               ctx.rotate(rightRotation * Math.PI / 180);
               ctx.drawImage(
                 imgRight,
-                -rightImgWidth / 2, // Ajuster pour le pivot
-                -rightImgHeight / 2, // Ajuster pour le pivot
+                -rightImgWidth / 2,
+                -rightImgHeight / 2,
                 rightImgWidth,
                 rightImgHeight
               );
               ctx.restore();
-              
+      
               // Position du VS exactement au milieu entre les deux images
               // Calcul des positions des images pour le texte VS
               const leftImageCenter = leftX + leftImgWidth / 2;
               const rightImageCenter = rightX + rightImgWidth / 2;
               const middlePoint = (leftImageCenter + rightImageCenter) / 2;
-              
+      
               // Rendu du texte VS au milieu
               ctx.font = `${30 * scaleX}px Arial`;
               ctx.fillStyle = 'white';
               ctx.strokeStyle = 'black';
               ctx.lineWidth = 2;
               ctx.textAlign = 'center';
-              ctx.fillText(vsText, middlePoint, forehead.y - -30 * scaleY);
-              
+              ctx.fillText(vsText, middlePoint, forehead.y - 40 * scaleY);
+      
               // Afficher les indicateurs visuels de sélection potentielle
               if (Math.abs(tiltFactor) > SLIGHT_TILT_THRESHOLD * 5) {
                 // Choisir la couleur en fonction de l'inclinaison
-                let indicatorColor;
-                let indicatorX;
-                let indicatorText;
-                
-                
-                
-                // Dessiner un cercle autour du film sélectionné
-                ctx.beginPath();
-                ctx.arc(
-                  indicatorX, 
-                  forehead.y - 30 * scaleY, 
-                  Math.max(leftImgWidth, rightImgWidth) / 1.6, 
-                  0, 
-                  2 * Math.PI
-                );
-                ctx.strokeStyle = indicatorColor;
-                ctx.lineWidth = 4;
-                ctx.stroke();
-                
-                // Texte d'indication
-                ctx.font = `bold ${22 * scaleX}px Arial`;
-                ctx.fillStyle = indicatorColor;
-                ctx.textAlign = 'center';
-                ctx.fillText(
-                  indicatorText, 
-                  indicatorX, 
-                  forehead.y - 100 * scaleY
-                );
+                let indicatorColor = tiltFactor > 0 ? 'rgba(255,215,0,0.8)' : 'rgba(127,255,212,0.8)';
+                let indicatorX = tiltFactor > 0 ? rightX + rightImgWidth/2 : leftX + leftImgWidth/2;
+                let indicatorText = tiltFactor > 0 ? 'SÉLECTIONNER' : 'SÉLECTIONNER';
+        
+        
+        
               }
-            };
+            }
           }
         }
       }
     }
   };
 
-  useEffect(() => {
+   useEffect(() => {
     const interval = setInterval(detect, 100);
     return () => clearInterval(interval);
   });
@@ -519,14 +519,19 @@ export default function WebcamAR({ movies, setStep }) {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center' }}>
-      <div style={{ position: 'relative' }} onClick={filterType === 'grid' ? handleStopScrolling : null}>
+    <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '100vw', maxHeight: '100vh', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: VIDEO_WIDTH, height: VIDEO_HEIGHT }} onClick={filterType === 'grid' ? handleStopScrolling : null}>
         <Webcam
           ref={webcamRef}
           screenshotFormat="image/jpeg"
           width={VIDEO_WIDTH}
           height={VIDEO_HEIGHT}
           mirrored={true} // Inverse la webcam
+          videoConstraints={{
+            width: VIDEO_WIDTH,
+            height: VIDEO_HEIGHT,
+            facingMode: "user"
+          }}
         />
         <canvas
           ref={canvasRef}
@@ -535,17 +540,19 @@ export default function WebcamAR({ movies, setStep }) {
           height={VIDEO_HEIGHT}
         />
 
-        {/* Toggle Filter Type Button */}
+        {/* Toggle Filter Type Button - redimensionné et repositionné pour 1920x1080 */}
         <button
           onClick={toggleFilterType}
           style={{
             position: 'absolute',
-            top: 10,
-            left: 10,
-            padding: '6px 12px',
+            top: 20,
+            left: 20,
+            padding: '10px 20px',
             backgroundColor: '#f27300',
             color: 'white',
             border: '1px solid black',
+            fontSize: '18px',
+            borderRadius: '5px',
             zIndex: 100
           }}
         >
@@ -554,24 +561,27 @@ export default function WebcamAR({ movies, setStep }) {
 
         {filterType === 'grid' && (
           <>
-            {/* Modified Grid Cases - Numbers on the left side of the boxes */}
+            {/* Grid Cases - repositionnées pour 1920x1080 */}
             <div style={{ 
               position: 'absolute', 
-              top: 60, 
-              left: 50, 
+              top: 100, 
+              right: 80, // Changé pour droite pour éviter les problèmes de décalage
               display: 'flex', 
               flexDirection: 'column' 
             }}>
               {Array.from({ length: 10 }).map((_, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: '7px' }}>
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
                   {/* Number on the left side */}
                   <div style={{
-                    width: '20px',
-                    height: '20px',
+                    position: 'relative',
+                    bottom: 70,  
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginRight: '5px',
+                    marginRight: '10px',
+                    fontSize: '18px',
                     fontWeight: 'bold',
                     color: 'white',
                     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -584,9 +594,9 @@ export default function WebcamAR({ movies, setStep }) {
                   <div
                     onClick={() => handleCaptureInSlot(idx)}
                     style={{
-                      width: '80px',
-                      height: '79px',
-                      border: '1px solid white',
+                      width: '90px',
+                      height: '86px',
+                      bottom: 70,                      border: '1px solid white',
                       borderRadius: '10px',
                       backgroundColor: 'rgba(255,255,255,0.7)',
                       display: 'flex',
@@ -601,7 +611,7 @@ export default function WebcamAR({ movies, setStep }) {
                       <img
                         src={selectedMovies[idx]}
                         alt={`film-${idx}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
                       />
                     )}
                   </div>
@@ -609,23 +619,34 @@ export default function WebcamAR({ movies, setStep }) {
               ))}
             </div>
 
-            {/* Message en bas à gauche (Grid mode) */}
-            <div style={{ position: 'absolute', bottom: 10, left: 10, color: 'white', background: 'black', padding: '4px' }}>
+            {/* Message en bas à gauche (Grid mode) - adapté pour 1920x1080 */}
+            <div style={{ 
+              position: 'absolute', 
+              bottom: 20, 
+              left: 20, 
+              color: 'white', 
+              background: 'rgba(0,0,0,0.7)', 
+              padding: '10px',
+              fontSize: '18px',
+              borderRadius: '5px'
+            }}>
               {isStopped ? 'Clique sur une case ou relancer' : 'Clique pour stopper'}
             </div>
 
-            {/* Bouton relancer (Grid mode) */}
+            {/* Bouton relancer (Grid mode) - adapté pour 1920x1080 */}
             <button
               onClick={handleRelancer}
               disabled={!isStopped}
               style={{
                 position: 'absolute',
-                bottom: 10,
-                right: 10,
-                padding: '6px 12px',
+                bottom: 20,
+                left: '17em',
+                padding: '10px 20px',
+                fontSize: '18px',
                 backgroundColor: isStopped ? 'white' : 'gray',
                 color: isStopped ? 'black' : 'lightgray',
                 border: '1px solid black',
+                borderRadius: '5px',
                 cursor: isStopped ? 'pointer' : 'not-allowed'
               }}
             >
@@ -635,50 +656,50 @@ export default function WebcamAR({ movies, setStep }) {
         )}
 
         {filterType === 'tournament' && (
-  <>
-    {/* Tournament Bracket Display */}
-    <div style={{ 
-      position: 'absolute', 
-      bottom: 0, 
-      left: 198, 
-      right: 55,
-      height: '600px',
-      display: 'flex',
-      justifyContent: 'space-between'
-    }}>
-      {/* Colonne Gauche - 4 premiers films */}
-      <div style={{ width: '30%', position: 'relative', height: '100%' }}>
-        {tournamentMovies.bracket.slice(0, 4).map((movie, idx) => (
-          <div key={`left-${idx}`} style={{
-            position: 'absolute',
-            width: '80px',
-            height: '80px',
-            left: '20%',
-            top: `${10 + idx * 20}%`,
-            border: '2px solid #666',
-            borderRadius: '10px',
-            backgroundColor: 'white',
-            overflow: 'hidden'
-          }}>
-            {movie && <img src={movie} alt="bracket" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-            <div style={{
-              position: 'absolute',
-              right: '-30px',
-              top: '50%',
-              width: '30px',
-              borderTop: '2px solid black'
-            }}></div>
-          </div>
-        ))}
-      </div>
+          <>
+            {/* Tournament Bracket Display - redimensionné pour 1920x1080 */}
+            <div style={{ 
+              position: 'absolute', 
+              bottom: 20, 
+              left: 280, 
+              right: 20,
+              height: '600px',
+              display: 'flex',
+              justifyContent: 'space-between'
+            }}>
+              {/* Colonne Gauche - 4 premiers films */}
+              <div style={{ width: '30%', position: 'relative', height: '100%' }}>
+                {tournamentMovies.bracket.slice(0, 4).map((movie, idx) => (
+                  <div key={`left-${idx}`} style={{
+                    position: 'absolute',
+                    width: '100px',
+                    height: '100px',
+                    left: '20%',
+                    top: `${10 + idx * 20}%`,
+                    border: '2px solid #666',
+                    borderRadius: '10px',
+                    backgroundColor: 'white',
+                    overflow: 'hidden'
+                  }}>
+                    {movie && <img src={movie} alt="bracket" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    <div style={{
+                      position: 'absolute',
+                      right: '-40px',
+                      top: '50%',
+                      width: '40px',
+                      borderTop: '3px solid #666'
+                    }}></div>
+                  </div>
+                ))}
+              </div>
 
       {/* Colonne Droite - 4 films suivants */}
       <div style={{ width: '30%', position: 'relative', height: '100%' }}>
         {tournamentMovies.bracket.slice(4, 8).map((movie, idx) => (
           <div key={`right-${idx}`} style={{
             position: 'absolute',
-            width: '80px',
-            height: '80px',
+            width: '100px',
+            height: '100px',
             right: '70%',
             top: `${10 + idx * 20}%`,
             border: '2px solid #666',
@@ -702,8 +723,8 @@ export default function WebcamAR({ movies, setStep }) {
       {tournamentMovies.bracket.slice(8, 12).map((movie, idx) => (
         <div key={`quarter-${idx}`} style={{
           position: 'absolute',
-          width: '80px',
-          height: '80px',
+          width: '100px',
+          height: '100px',
           left: idx < 2 ? '17%' : '60%',
           top: `${20 + (idx % 2) * 40}%`,
           border: '2px solid #666',
@@ -719,8 +740,8 @@ export default function WebcamAR({ movies, setStep }) {
       {tournamentMovies.bracket.slice(12, 14).map((movie, idx) => (
         <div key={`semi-${idx}`} style={{
           position: 'absolute',
-          width: '80px',
-          height: '80px',
+          width: '100px',
+          height: '100px',
           left: `${26 + idx * 26}%`,
           top: '41%',
           border: '2px solid #666',
@@ -736,11 +757,11 @@ export default function WebcamAR({ movies, setStep }) {
       {tournamentMovies.bracket[14] && (
         <div style={{
           position: 'absolute',
-          left: '43.5%',
+          left: '42.5%',
           top: '48%',
           transform: 'translate(-50%, -50%)',
-          width: '130px',
-          height: '140px',
+          width: '180px',
+          height: '240px',
           border: '4px solid gold',
           borderRadius: '10px',
           backgroundColor: 'white',
@@ -769,23 +790,8 @@ export default function WebcamAR({ movies, setStep }) {
       )}
     </div>
 
-    {/* Tournament instructions and status */}
-    <div style={{ 
-      position: 'absolute',
-      top: 50, 
-      left: 0,
-      right: 0,
-      textAlign: 'center',
-      color: 'white',
-      backgroundColor: 'rgba(0,0,0,0.7)',
-      padding: '10px'
-    }}>
-      {tournamentCompleted 
-        ? 'Le tournoi est terminé ! Clique sur "Rejouer" pour recommencer'
-        : tournamentMovies.current && tournamentMovies.opponent 
-          ? 'Inclinez la tête vers la gauche ou la droite pour choisir votre film préféré !' 
-          : 'Initialisation du tournoi...'}
-    </div>
+    
+    
     </>
   )}
 
