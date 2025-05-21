@@ -17,7 +17,7 @@ export default function ProfileForm() {
   setError(null);
 
   try {
-    const response = await fetch('http://31.56.58.171/api/fetchMovies', {
+    const response = await fetch('http://localhost:3000/api/fetchMovies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, listName}),
@@ -91,6 +91,8 @@ export default function ProfileForm() {
       loadingMessage = "Change de pp letterbox par pitié";
     } else if (lowerUsername === 'hamzakerdaloco') {
       loadingMessage = "Reviens vers la rue stp Hamza";
+    } else if (lowerUsername === 'roronoa_kenzo') {
+      loadingMessage = "SIMPLE AND CLEANNNNN";
     }
 
     return (
