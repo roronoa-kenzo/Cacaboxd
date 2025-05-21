@@ -17,7 +17,7 @@ export default function ProfileForm() {
   setError(null);
 
   try {
-    const response = await fetch('http://31.56.58.171/api/fetchMovies', {
+    const response = await fetch('http://localhost:3000/api/fetchMovies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, listName}),
