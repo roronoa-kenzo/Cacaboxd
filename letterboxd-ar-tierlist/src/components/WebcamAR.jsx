@@ -5,7 +5,8 @@ import * as faceapi from 'face-api.js';
 export default function WebcamAR({ movies, setStep }) {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-  const intervalRef = useRef(null);
+
+
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedMovies, setSelectedMovies] = useState(Array(10).fill(null));
   const [isStopped, setIsStopped] = useState(false);
@@ -13,26 +14,33 @@ export default function WebcamAR({ movies, setStep }) {
   const [tournamentMovies, setTournamentMovies] = useState({
     current: null,
     opponent: null,
-    bracket: Array(15).fill(null) // 8 films require 15 slots for a complete tournament bracket
+    bracket: Array(15).fill(null),
   });
-  const [headPosition, setHeadPosition] = useState('center'); // 'left', 'center', or 'right'
-  const [headTiltDegree, setHeadTiltDegree] = useState(0); // Niveau d'inclinaison -100 à 100 
+  const [smoothTiltFactor, setSmoothTiltFactor] = useState(0);
+const prevTiltFactorRef = useRef(0);
+  const [headPosition, setHeadPosition] = useState('center');
+  const [headTiltDegree, setHeadTiltDegree] = useState(0);
   const [loadedImages, setLoadedImages] = useState({});
+
+  const scrollAnimationFrameRef = useRef(null);
+const lastScrollTimeRef = useRef(0);
+const SCROLL_INTERVAL = 150; // en ms
+
+
   const headPositionRef = useRef('center');
   const lastSelectionTime = useRef(0);
-  const selectionCooldown = 2000; // 2 secondes de cooldown entre les sélections
+  const selectionCooldown = 2000;
 
   const VIDEO_WIDTH = 1920;
   const VIDEO_HEIGHT = 1080;
 
   const allSlotsFilled = selectedMovies.every((slot) => slot !== null);
-  // Tournament is completed when we have a winner in position 14 (the final position)
   const tournamentCompleted = tournamentMovies.bracket[14] !== null;
 
-  // Seuils pour les niveaux d'inclinaison
-  const SLIGHT_TILT_THRESHOLD = 10; // Seuil pour l'effet visuel
-  const SELECTION_TILT_THRESHOLD = 20; // Seuil pour la sélection définitive
+  const SLIGHT_TILT_THRESHOLD = 10;
+  const SELECTION_TILT_THRESHOLD = 20;
 
+  // Chargement des modèles face-api.js
   useEffect(() => {
     const loadModels = async () => {
       const MODEL_URL = '/models';
@@ -42,280 +50,223 @@ export default function WebcamAR({ movies, setStep }) {
     loadModels();
   }, []);
 
-  const startScrolling = () => {
-    clearInterval(intervalRef.current);
-
-    intervalRef.current = setInterval(() => {
-      setCurrentIdx((prevIdx) => {
-        let nextIdx = prevIdx;
-        let tries = 0;
-        const totalMovies = movies.length;
-
-        do {
-          nextIdx = (nextIdx + 1) % totalMovies;
-          tries++;
-        } while (selectedMovies.includes(movies[nextIdx]) && tries <= totalMovies);
-
-        if (tries > totalMovies) {
-          clearInterval(intervalRef.current);
-          console.log('Tous les films ont été sélectionnés');
-          return prevIdx;
-        }
-
-        return nextIdx;
-      });
-    }, 300);
-  };
-
   useEffect(() => {
-    if (!movies || movies.length === 0) return;
-    
-    if (filterType === 'grid') {
-      startScrolling();
-    } else if (filterType === 'tournament' && !tournamentMovies.current && !tournamentMovies.opponent && !tournamentCompleted) {
-      // For tournament mode, select two random movies
-      const randomIndex1 = Math.floor(Math.random() * movies.length);
-      let randomIndex2;
+  if (filterType === 'grid' && movies[currentIdx] && !loadedImages[movies[currentIdx]]) {
+    const img = new Image();
+    img.src = movies[currentIdx];
+    img.onload = () => {
+      setLoadedImages(prev => ({ ...prev, [movies[currentIdx]]: img }));
+    };
+  }
+}, [currentIdx, filterType, movies, loadedImages]);
+
+  // Fonction de défilement automatique
+  const scrollLoop = (timestamp) => {
+  if (!lastScrollTimeRef.current) lastScrollTimeRef.current = timestamp;
+
+  const elapsed = timestamp - lastScrollTimeRef.current;
+  if (elapsed >= SCROLL_INTERVAL) {
+    setCurrentIdx((prevIdx) => {
+      let nextIdx = prevIdx;
+      let tries = 0;
+      const totalMovies = movies.length;
+
       do {
-        randomIndex2 = Math.floor(Math.random() * movies.length);
-      } while (randomIndex2 === randomIndex1);
-      
-      setTournamentMovies(prev => ({
-        ...prev,
-        current: movies[randomIndex1],
-        opponent: movies[randomIndex2]
-      }));
+        nextIdx = (nextIdx + 1) % totalMovies;
+        tries++;
+      } while (selectedMovies.includes(movies[nextIdx]) && tries <= totalMovies);
+
+      if (tries > totalMovies) {
+        console.log('Tous les films ont été sélectionnés');
+        return prevIdx;
+      }
+
+      return nextIdx;
+    });
+
+    lastScrollTimeRef.current = timestamp;
+  }
+
+  scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+};
+
+
+  // Effet spécifique au mode grid (défilement)
+ useEffect(() => {
+  if (!movies || movies.length === 0 || filterType !== 'grid') return;
+
+  scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+
+  return () => {
+    if (scrollAnimationFrameRef.current) {
+      cancelAnimationFrame(scrollAnimationFrameRef.current);
+      scrollAnimationFrameRef.current = null;
     }
-    
-    return () => clearInterval(intervalRef.current);
-  }, [movies, selectedMovies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
+  };
+}, [movies, selectedMovies, filterType]);
+
+
+  // Effet spécifique au mode tournoi
+  useEffect(() => {
+    if (
+      !movies ||
+      movies.length === 0 ||
+      filterType !== 'tournament' ||
+      tournamentMovies.current ||
+      tournamentMovies.opponent ||
+      tournamentCompleted
+    )
+      return;
+
+    const randomIndex1 = Math.floor(Math.random() * movies.length);
+    let randomIndex2;
+    do {
+      randomIndex2 = Math.floor(Math.random() * movies.length);
+    } while (randomIndex2 === randomIndex1);
+
+    setTournamentMovies((prev) => ({
+      ...prev,
+      current: movies[randomIndex1],
+      opponent: movies[randomIndex2],
+    }));
+  }, [movies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
+
 
   const detect = async () => {
-    if (webcamRef.current && canvasRef.current) {
-      const video = webcamRef.current.video;
-      const detections = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks();
+    if (!webcamRef.current || !canvasRef.current) {
+      animationFrameRef.current = requestAnimationFrame(detect);
+      return;
+    }
 
-      const dims = { width: VIDEO_WIDTH, height: VIDEO_HEIGHT };
-      const resized = faceapi.resizeResults(detections, dims);
+    const video = webcamRef.current.video;
+    const detections = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks();
 
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-      if (detections && detections.landmarks) {
-        const forehead = detections.landmarks.positions[22];
-        const nose = detections.landmarks.positions[30];
-        const leftEye = detections.landmarks.positions[36];
-        const rightEye = detections.landmarks.positions[45];
-        
-        // Calcul du centre du visage
-        const faceCenter = {
-          x: (leftEye.x + rightEye.x) / 2,
-          y: (leftEye.y + rightEye.y) / 2
-        };
-        
-        // Calcul du décalage horizontal de la tête
-        const eyesVector = {
-          x: rightEye.x - leftEye.x,
-          y: rightEye.y - leftEye.y
-        };
-        
-        // Normalisation du vecteur yeux
-        const eyesLength = Math.sqrt(eyesVector.x * eyesVector.x + eyesVector.y * eyesVector.y);
-        const normalizedEyesVector = {
-          x: eyesVector.x / eyesLength,
-          y: eyesVector.y / eyesLength
-        };
-        
-        // Calcul de l'angle de rotation de la tête (en radians)
-        const headAngle = Math.atan2(normalizedEyesVector.y, normalizedEyesVector.x);
-        const headAngleDegrees = headAngle * (180 / Math.PI);
-        
-        // Quantifier le degré d'inclinaison de -100 (extrême gauche) à +100 (extrême droite)
-        let tiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
-        setHeadTiltDegree(tiltFactor);
-        
-        // Détermine la position de la tête basée sur l'angle
-        let newHeadPosition = 'center';
-        
-        if (Math.abs(headAngleDegrees) < SLIGHT_TILT_THRESHOLD) {
-          newHeadPosition = 'center';
-        } else if (headAngleDegrees > 0) {
-          newHeadPosition = 'left'; // La webcam est inversée donc positif = gauche
-        } else {
-          newHeadPosition = 'right'; // La webcam est inversée donc négatif = droite
-        }
-        
-        // Mise à jour de la position de la tête
-        if (newHeadPosition !== headPositionRef.current) {
-          headPositionRef.current = newHeadPosition;
-          setHeadPosition(newHeadPosition);
-        }
-        
-        // Vérification pour la sélection définitive uniquement si l'angle dépasse le seuil de sélection
-        if (filterType === 'tournament' && 
-    !tournamentCompleted && 
-    tournamentMovies.current && 
-    tournamentMovies.opponent &&
-    Math.abs(headAngleDegrees) > SELECTION_TILT_THRESHOLD &&
-    Date.now() - lastSelectionTime.current > selectionCooldown) {
+    if (!detections || !detections.landmarks) {
+      animationFrameRef.current = requestAnimationFrame(detect);
+      return;
+    }
+
+    const { positions } = detections.landmarks;
+    const forehead = positions[22];
+    const leftEye = positions[36];
+    const rightEye = positions[45];
+
+    const eyesVector = { x: rightEye.x - leftEye.x, y: rightEye.y - leftEye.y };
+    const eyesLength = Math.sqrt(eyesVector.x ** 2 + eyesVector.y ** 2);
+    const normalizedEyesVector = { x: eyesVector.x / eyesLength, y: eyesVector.y / eyesLength };
+    const headAngleDegrees = Math.atan2(normalizedEyesVector.y, normalizedEyesVector.x) * (180 / Math.PI);
+    const tiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
+    setHeadTiltDegree(tiltFactor);
+
+    // Ajoutez ce code de lissage après le calcul de tiltFactor
+    const headPositionSmoothing = 0.15; // Ajustez cette valeur selon la fluidité désirée (0.05-0.3)
+    const smoothedTiltFactor = prevTiltFactorRef.current * (1 - headPositionSmoothing) + 
+                               tiltFactor * headPositionSmoothing;
+    prevTiltFactorRef.current = smoothedTiltFactor;
+    setSmoothTiltFactor(smoothedTiltFactor);
+
+    // Utilisez smoothedTiltFactor au lieu de tiltFactor
+    setHeadTiltDegree(smoothedTiltFactor);
+
+    if (filterType === 'tournament' &&
+      !tournamentCompleted &&
+      tournamentMovies.current &&
+      tournamentMovies.opponent &&
+      Math.abs(headAngleDegrees) > SELECTION_TILT_THRESHOLD &&
+      Date.now() - lastSelectionTime.current > selectionCooldown) {
   
-  // CORRECTION ICI: Inverser la logique de sélection
-  const isLeftWinner = headAngleDegrees > 0; // Quand on penche à gauche (valeur négative), sélectionner le film de gauche
-  handleSelectTournamentWinner(isLeftWinner);
-  lastSelectionTime.current = Date.now();
-}
-        
-        const scaleX = VIDEO_WIDTH / 900;
-        const scaleY = VIDEO_HEIGHT / 450;
-        
-        if (filterType === 'grid') {
-          // Original filter - show one movie on forehead
-          const img = new Image();
-          img.src = movies[currentIdx];
+        handleSelectTournamentWinner(headAngleDegrees > 0); // gauche = current gagne
+        lastSelectionTime.current = Date.now();
+      }
 
-          img.onload = () => {
-            ctx.drawImage(
-            img,
-            VIDEO_WIDTH - forehead.x - 40 * scaleX, // <- Inversion horizontale
-            forehead.y - 160 * scaleY,
-            110 * scaleX,
-            140 * scaleY
-            );
-          };
-          
-        
+    const scaleX = VIDEO_WIDTH / 900;
+    const scaleY = VIDEO_HEIGHT / 450;
 
-        // Puis modifiez la partie de rendu des images dans la fonction detect()
-        // Localisez le bloc où le tournoi est rendu (environ ligne 359) et remplacez par:
+    if (filterType === 'grid') {
+      const img = loadedImages[movies[currentIdx]];
+      if (img) {
+        ctx.drawImage(img, VIDEO_WIDTH - forehead.x - 40 * scaleX, forehead.y - 160 * scaleY, 110 * scaleX, 140 * scaleY);
+      };
+    } else if (filterType === 'tournament') {
+      const { current, opponent } = tournamentMovies;
+      if (!current || !opponent) {
+        animationFrameRef.current = requestAnimationFrame(detect);
+        return;
+      }
 
-        } else if (filterType === 'tournament') {
-          // Tournament filter - show two movies facing off
-          if (tournamentMovies.current && tournamentMovies.opponent) {
-            // Vérifier si les images sont déjà chargées
-            if (!loadedImages[tournamentMovies.current]) {
-              const imgLeft = new Image();
-              imgLeft.src = tournamentMovies.current;
-              imgLeft.onload = () => {
-                setLoadedImages(prev => ({
-                  ...prev,
-                  [tournamentMovies.current]: imgLeft
-                }));
-              };
-            }
-    
-            if (!loadedImages[tournamentMovies.opponent]) {
-              const imgRight = new Image();
-              imgRight.src = tournamentMovies.opponent;
-              imgRight.onload = () => {
-                setLoadedImages(prev => ({
-                  ...prev,
-                  [tournamentMovies.opponent]: imgRight
-                }));
-              };
-            }
-    
-            const imgLeft = loadedImages[tournamentMovies.current];
-            const imgRight = loadedImages[tournamentMovies.opponent];
-            const vsText = "VS";
-    
-            if (imgLeft && imgRight) {
-              // Constantes pour le dessin des images
-              const baseImgWidth = 100 * scaleX;
-              const baseImgHeight = 150 * scaleY;
-              const baseLeftX = forehead.x - -70 * scaleX;
-              const baseRightX = forehead.x + -130 * scaleX;
-              const baseY = forehead.y - 180 * scaleY;
-      
-              // Effet de penchement en temps réel basé sur l'inclinaison de la tête
-              // L'effet est proportionnel au degré d'inclinaison
-      
-              // Normaliser le tiltFactor pour en faire un pourcentage
-              const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor)); 
-              const normalizedRightTilt = Math.max(0, tiltFactor);
-      
-              // Calculer l'échelle et rotation en fonction de l'inclinaison
-              const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
-              const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
-      
-              const leftRotation = (normalizedLeftTilt / 100) * 10;
-              const rightRotation = -(normalizedRightTilt / 100) * 10;
-      
-              // Calculer les dimensions et positions finales
-              const leftImgWidth = baseImgWidth * leftScale;
-              const leftImgHeight = baseImgHeight * leftScale;
-              const rightImgWidth = baseImgWidth * rightScale;
-              const rightImgHeight = baseImgHeight * rightScale;
-      
-              // Ajuster les positions pour que les agrandissements soient centrés
-              const leftX = baseLeftX - (leftImgWidth - baseImgWidth) / 2;
-              const leftY = baseY - (leftImgHeight - baseImgHeight) / 2;
-              const rightX = baseRightX - (rightImgWidth - baseImgWidth) / 2;
-              const rightY = baseY - (rightImgHeight - baseImgHeight) / 2;
-      
-              // Dessiner l'image de gauche avec rotation
-              ctx.save();
-              // Définir le point de pivot au centre de l'image
-              const leftPivotX = leftX + leftImgWidth / 2;
-              const leftPivotY = leftY + leftImgHeight / 2;
-              ctx.translate(leftPivotX, leftPivotY);
-              ctx.rotate(leftRotation * Math.PI / 180);
-              ctx.drawImage(
-                imgLeft,
-                -leftImgWidth / 2,
-                -leftImgHeight / 2,
-                leftImgWidth,
-                leftImgHeight
-              );
-              ctx.restore();
-      
-              // Dessiner l'image de droite avec rotation
-              ctx.save();
-              // Définir le point de pivot au centre de l'image
-              const rightPivotX = rightX + rightImgWidth / 2;
-              const rightPivotY = rightY + rightImgHeight / 2;
-              ctx.translate(rightPivotX, rightPivotY);
-              ctx.rotate(rightRotation * Math.PI / 180);
-              ctx.drawImage(
-                imgRight,
-                -rightImgWidth / 2,
-                -rightImgHeight / 2,
-                rightImgWidth,
-                rightImgHeight
-              );
-              ctx.restore();
-      
-              // Position du VS exactement au milieu entre les deux images
-              // Calcul des positions des images pour le texte VS
-              const leftImageCenter = leftX + leftImgWidth / 2;
-              const rightImageCenter = rightX + rightImgWidth / 2;
-              const middlePoint = (leftImageCenter + rightImageCenter) / 2;
-      
-              // Rendu du texte VS au milieu
-              ctx.font = `${30 * scaleX}px Arial`;
-              ctx.fillStyle = 'white';
-              ctx.strokeStyle = 'black';
-              ctx.lineWidth = 2;
-              ctx.textAlign = 'center';
-              ctx.fillText(vsText, middlePoint, forehead.y - 40 * scaleY);
-      
-              // Afficher les indicateurs visuels de sélection potentielle
-              if (Math.abs(tiltFactor) > SLIGHT_TILT_THRESHOLD * 5) {
-                // Choisir la couleur en fonction de l'inclinaison
-                let indicatorColor = tiltFactor > 0 ? 'rgba(255,215,0,0.8)' : 'rgba(127,255,212,0.8)';
-                let indicatorX = tiltFactor > 0 ? rightX + rightImgWidth/2 : leftX + leftImgWidth/2;
-                let indicatorText = tiltFactor > 0 ? 'SÉLECTIONNER' : 'SÉLECTIONNER';
-        
-        
-        
-              }
-            }
-          }
-        }
+      if (!loadedImages[current]) {
+        const img = new Image();
+        img.src = current;
+        img.onload = () => setLoadedImages(prev => ({ ...prev, [current]: img }));
+      }
+
+      if (!loadedImages[opponent]) {
+        const img = new Image();
+        img.src = opponent;
+        img.onload = () => setLoadedImages(prev => ({ ...prev, [opponent]: img }));
+      }
+
+      const imgLeft = loadedImages[current];
+      const imgRight = loadedImages[opponent];
+
+      if (imgLeft && imgRight) {
+        const baseImgWidth = 110 * scaleX;
+        const baseImgHeight = 140 * scaleY;
+        const baseLeftX = forehead.x - -70 * scaleX;
+        const baseRightX = forehead.x + -130 * scaleX;
+        const baseY = forehead.y - 180 * scaleY;
+
+        const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor));
+        const normalizedRightTilt = Math.max(0, tiltFactor);
+        const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
+        const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
+        const leftRotation = (normalizedLeftTilt / 100) * 10;
+        const rightRotation = -(normalizedRightTilt / 100) * 10;
+
+        const drawImageWithRotation = (img, x, y, width, height, rotation) => {
+          ctx.save();
+          ctx.translate(x + width / 2, y + height / 2);
+          ctx.rotate(rotation * Math.PI / 180);
+          // Début du masque arrondi (border-radius)
+          const radius = 20; // ajuste ce rayon selon l’effet souhaité
+          ctx.beginPath();
+          ctx.moveTo(-width / 2 + radius, -height / 2);
+          ctx.lineTo(width / 2 - radius, -height / 2);
+          ctx.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
+          ctx.lineTo(width / 2, height / 2 - radius);
+          ctx.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
+          ctx.lineTo(-width / 2 + radius, height / 2);
+          ctx.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
+          ctx.lineTo(-width / 2, -height / 2 + radius);
+          ctx.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+          ctx.closePath();
+          ctx.clip(); // on applique le masque
+          ctx.drawImage(img, -width / 2, -height / 2, width, height);
+          ctx.restore();
+        };
+
+        drawImageWithRotation(imgLeft, baseLeftX, baseY, baseImgWidth * leftScale, baseImgHeight * leftScale, leftRotation);
+        drawImageWithRotation(imgRight, baseRightX, baseY, baseImgWidth * rightScale, baseImgHeight * rightScale, rightRotation);
+
+        // VS text
+        ctx.font = `${30 * scaleX}px Arial`;
+        ctx.fillStyle = 'white';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.textAlign = 'center';
+        const middle = (baseLeftX + baseImgWidth + baseRightX) / 2;
+        ctx.fillText('VS', middle, forehead.y - 90 * scaleY);
       }
     }
+
+    animationFrameRef.current = requestAnimationFrame(detect);
   };
+
 
    useEffect(() => {
     const interval = setInterval(detect, 100);
@@ -324,10 +275,14 @@ export default function WebcamAR({ movies, setStep }) {
 
   const handleStopScrolling = () => {
     if (!isStopped && filterType === 'grid') {
-      clearInterval(intervalRef.current);
-      setIsStopped(true);
-      console.log(`Défilement stoppé sur l'image: ${movies[currentIdx]}`);
-    }
+  if (scrollAnimationFrameRef.current) {
+    cancelAnimationFrame(scrollAnimationFrameRef.current);
+    scrollAnimationFrameRef.current = null;
+  }
+  setIsStopped(true);
+  console.log(`Défilement stoppé sur l'image: ${movies[currentIdx]}`);
+}
+
   };
 
   const handleCaptureInSlot = (slotIdx) => {
@@ -338,7 +293,7 @@ export default function WebcamAR({ movies, setStep }) {
       setSelectedMovies(updated);
       console.log(`Film ajouté en case ${slotIdx + 1}: ${movies[currentIdx]}`);
       setIsStopped(false);
-      startScrolling();
+      scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
     }
   };
 
@@ -449,18 +404,33 @@ export default function WebcamAR({ movies, setStep }) {
   };
 
   const handleRelancer = () => {
-    if (!isStopped || filterType !== 'grid') return; // déjà en train de défiler
+  if (filterType === 'grid') {
+    setCurrentIdx(0);
+    lastScrollTimeRef.current = 0;
     setIsStopped(false);
-    startScrolling();
-    console.log('Défilement relancé');
-  };
+
+    if (!scrollAnimationFrameRef.current) {
+      scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+    }
+  } else if (filterType === 'tournament') {
+    // Rien à faire ici pour l’instant
+  }
+};
 
   const handleRejouer = () => {
     if (filterType === 'grid') {
       setSelectedMovies(Array(10).fill(null));
-      setIsStopped(false);
-      startScrolling();
-      console.log('Jeu relancé, toutes les cases vidées');
+
+// Empêche le défilement auto à la relance
+setIsStopped(true);
+
+// Stoppe proprement toute animation en cours
+if (scrollAnimationFrameRef.current) {
+  cancelAnimationFrame(scrollAnimationFrameRef.current);
+  scrollAnimationFrameRef.current = null;
+}
+
+console.log('Jeu relancé, toutes les cases vidées');
     } else if (filterType === 'tournament') {
       // Reset tournament
       setTournamentMovies({
@@ -488,7 +458,7 @@ export default function WebcamAR({ movies, setStep }) {
     if (filterType === 'grid') {
       // Switch to tournament mode
       setFilterType('tournament');
-      clearInterval(intervalRef.current);
+
       setIsStopped(false);
       
       // Reset tournament state
@@ -546,7 +516,7 @@ export default function WebcamAR({ movies, setStep }) {
           style={{
             position: 'absolute',
             top: 20,
-            left: 20,
+            right: 20,
             padding: '10px 20px',
             backgroundColor: '#f27300',
             color: 'white',
@@ -565,7 +535,7 @@ export default function WebcamAR({ movies, setStep }) {
             <div style={{ 
               position: 'absolute', 
               top: 100, 
-              right: 80, // Changé pour droite pour éviter les problèmes de décalage
+              left: 35,
               display: 'flex', 
               flexDirection: 'column' 
             }}>
@@ -623,7 +593,7 @@ export default function WebcamAR({ movies, setStep }) {
             <div style={{ 
               position: 'absolute', 
               bottom: 20, 
-              left: 20, 
+              right: 20, 
               color: 'white', 
               background: 'rgba(0,0,0,0.7)', 
               padding: '10px',
@@ -640,7 +610,7 @@ export default function WebcamAR({ movies, setStep }) {
               style={{
                 position: 'absolute',
                 bottom: 20,
-                left: '17em',
+                right: '17em',
                 padding: '10px 20px',
                 fontSize: '18px',
                 backgroundColor: isStopped ? 'white' : 'gray',
@@ -801,12 +771,12 @@ export default function WebcamAR({ movies, setStep }) {
             onClick={handleRejouer}
             style={{
               position: 'absolute',
-              top: 10,
-              right: 10,
-              padding: '6px 12px',
-              backgroundColor: 'white',
-              color: 'black',
-              border: '1px solid black'
+              top: '1.5em',
+              right: '19em',
+              padding: '10px 12px',
+              backgroundColor: '#00d543',
+              color: '#ffffff',
+              border: '1px solid black'                 
             }}
           >
             Rejouer

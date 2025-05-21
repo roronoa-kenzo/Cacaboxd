@@ -99,6 +99,8 @@ const handleSubmit = async (e) => {
       loadingMessage = "Change de pp letterbox par pitié";
     } else if (lowerUsername === 'hamzakerdaloco') {
       loadingMessage = "Reviens vers la rue stp Hamza";
+    } else if (lowerUsername === 'roronoa_kenzo') {
+      loadingMessage = "SIMPLE AND CLEANNNNN";
     }
 
     return (
