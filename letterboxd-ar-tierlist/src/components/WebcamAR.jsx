@@ -10,6 +10,8 @@ export default function WebcamAR({ movies, setStep }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedMovies, setSelectedMovies] = useState(Array(10).fill(null));
   const [isStopped, setIsStopped] = useState(false);
+  const [hasStartedGrid, setHasStartedGrid] = useState(false);
+
   const [filterType, setFilterType] = useState('grid'); // 'grid' or 'tournament'
   const [tournamentMovies, setTournamentMovies] = useState({
     current: null,
@@ -49,6 +51,24 @@ const SCROLL_INTERVAL = 150; // en ms
     };
     loadModels();
   }, []);
+
+  // Préchargement des images pour le mode tournament
+  useEffect(() => {
+    if (filterType === 'tournament' && tournamentMovies.current && tournamentMovies.opponent) {
+      // Préchargement des images du match actuel
+      if (tournamentMovies.current && !loadedImages[tournamentMovies.current]) {
+        const img = new Image();
+        img.src = tournamentMovies.current;
+        img.onload = () => setLoadedImages(prev => ({ ...prev, [tournamentMovies.current]: img }));
+      }
+      
+      if (tournamentMovies.opponent && !loadedImages[tournamentMovies.opponent]) {
+        const img = new Image();
+        img.src = tournamentMovies.opponent;
+        img.onload = () => setLoadedImages(prev => ({ ...prev, [tournamentMovies.opponent]: img }));
+      }
+    }
+  }, [tournamentMovies.current, tournamentMovies.opponent, filterType, loadedImages]);
 
   useEffect(() => {
   if (filterType === 'grid' && movies[currentIdx] && !loadedImages[movies[currentIdx]]) {
@@ -93,7 +113,7 @@ const SCROLL_INTERVAL = 150; // en ms
 
   // Effet spécifique au mode grid (défilement)
  useEffect(() => {
-  if (!movies || movies.length === 0 || filterType !== 'grid') return;
+  if (!movies || movies.length === 0 || filterType !== 'grid' || !hasStartedGrid) return;
 
   scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
 
@@ -103,36 +123,40 @@ const SCROLL_INTERVAL = 150; // en ms
       scrollAnimationFrameRef.current = null;
     }
   };
-}, [movies, selectedMovies, filterType]);
+}, [movies, selectedMovies, filterType, hasStartedGrid]);
 
 
-  // Effet spécifique au mode tournoi
+
   useEffect(() => {
-    if (
-      !movies ||
-      movies.length === 0 ||
-      filterType !== 'tournament' ||
-      tournamentMovies.current ||
-      tournamentMovies.opponent ||
-      tournamentCompleted
-    )
-      return;
+    
+  if (
+    !movies ||
+    movies.length === 0 ||
+    filterType !== 'tournament' ||
+    tournamentMovies.current ||
+    tournamentMovies.opponent ||
+    tournamentCompleted
+  )
+    return;
 
-    const randomIndex1 = Math.floor(Math.random() * movies.length);
-    let randomIndex2;
-    do {
-      randomIndex2 = Math.floor(Math.random() * movies.length);
-    } while (randomIndex2 === randomIndex1);
+  const randomIndex1 = Math.floor(Math.random() * movies.length);
+  let randomIndex2;
+  do {
+    randomIndex2 = Math.floor(Math.random() * movies.length);
+  } while (randomIndex2 === randomIndex1);
 
-    setTournamentMovies((prev) => ({
-      ...prev,
-      current: movies[randomIndex1],
-      opponent: movies[randomIndex2],
-    }));
-  }, [movies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
+  setTournamentMovies((prev) => ({
+    ...prev,
+    current: movies[randomIndex1],
+    opponent: movies[randomIndex2],
+  }));
+}, [movies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
 
-
+  
+  
+  
   const detect = async () => {
+    
     if (!webcamRef.current || !canvasRef.current) {
       animationFrameRef.current = requestAnimationFrame(detect);
       return;
@@ -193,11 +217,9 @@ const SCROLL_INTERVAL = 150; // en ms
         ctx.drawImage(img, VIDEO_WIDTH - forehead.x - 40 * scaleX, forehead.y - 160 * scaleY, 110 * scaleX, 140 * scaleY);
       };
     } else if (filterType === 'tournament') {
+
       const { current, opponent } = tournamentMovies;
-      if (!current || !opponent) {
-        animationFrameRef.current = requestAnimationFrame(detect);
-        return;
-      }
+      
 
       if (!loadedImages[current]) {
         const img = new Image();
@@ -211,10 +233,12 @@ const SCROLL_INTERVAL = 150; // en ms
         img.onload = () => setLoadedImages(prev => ({ ...prev, [opponent]: img }));
       }
 
-      const imgLeft = loadedImages[current];
-      const imgRight = loadedImages[opponent];
-
+      
+      const imgLeft = current ? loadedImages[current] : null;
+    const imgRight = opponent ? loadedImages[opponent] : null;
+      
       if (imgLeft && imgRight) {
+        
         const baseImgWidth = 110 * scaleX;
         const baseImgHeight = 140 * scaleY;
         const baseLeftX = forehead.x - -70 * scaleX;
@@ -269,8 +293,8 @@ const SCROLL_INTERVAL = 150; // en ms
 
 
    useEffect(() => {
-    const interval = setInterval(detect, 100);
-    return () => clearInterval(interval);
+    const interval = requestAnimationFrame(detect)
+    return () => cancelAnimationFrame(interval);
   });
 
   const handleStopScrolling = () => {
