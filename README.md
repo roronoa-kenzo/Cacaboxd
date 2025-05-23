@@ -1,4 +1,4 @@
-# 🎬 cacaboxd
+# 🎬 Cacaboxd
 
 **[👉 Visiter le site](https://cacaboxd.fr)**  
 *Le Letterboxd remixé à la sauce Twitch, TikTok & Tournois*
