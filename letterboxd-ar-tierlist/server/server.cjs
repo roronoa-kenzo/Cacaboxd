@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -19,6 +20,16 @@ app.use((req, res, next) => {
 });
 
 app.use(bodyParser.json());
+
+// Fonction pour mélanger un tableau (Fisher-Yates shuffle)
+function shuffleArray(array) {
+    const shuffled = [...array]; // Copie pour ne pas modifier l'original
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
 
 app.post('/api/fetchMovies', async (req, res) => {
     console.log('Received request to /api/fetchMovies with body:', req.body);
@@ -60,8 +71,11 @@ app.post('/api/fetchMovies', async (req, res) => {
             throw new Error(errorMsg);
         }
 
-        console.log(`Successfully returning ${posters.length} posters`);
-        res.json(posters);
+        // Mélange aléatoire des films pour éviter les patterns chronologiques
+        const shuffledPosters = shuffleArray(posters);
+        
+        console.log(`Films mélangés: ${shuffledPosters.length} films pour ${username}`);
+        res.json(shuffledPosters);
     } catch (err) {
         console.error('Error in /api/fetchMovies endpoint:', err);
         res.status(404).json({ error: err.message });
