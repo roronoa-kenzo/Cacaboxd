@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
@@ -5,7 +6,6 @@ import * as faceapi from 'face-api.js';
 export default function WebcamAR({ movies, setStep }) {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedMovies, setSelectedMovies] = useState(Array(10).fill(null));
@@ -27,7 +27,6 @@ const prevTiltFactorRef = useRef(0);
   const scrollAnimationFrameRef = useRef(null);
 const lastScrollTimeRef = useRef(0);
 const SCROLL_INTERVAL = 150; // en ms
-
 
   const headPositionRef = useRef('center');
   const lastSelectionTime = useRef(0);
@@ -110,7 +109,6 @@ const SCROLL_INTERVAL = 150; // en ms
   scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
 };
 
-
   // Effet spécifique au mode grid (défilement)
  useEffect(() => {
   if (!movies || movies.length === 0 || filterType !== 'grid' || !hasStartedGrid) return;
@@ -124,8 +122,6 @@ const SCROLL_INTERVAL = 150; // en ms
     }
   };
 }, [movies, selectedMovies, filterType, hasStartedGrid]);
-
-
 
   useEffect(() => {
     
@@ -152,8 +148,6 @@ const SCROLL_INTERVAL = 150; // en ms
   }));
 }, [movies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
 
-  
-  
   
   const detect = async () => {
     
@@ -257,7 +251,7 @@ const SCROLL_INTERVAL = 150; // en ms
           ctx.translate(x + width / 2, y + height / 2);
           ctx.rotate(rotation * Math.PI / 180);
           // Début du masque arrondi (border-radius)
-          const radius = 20; // ajuste ce rayon selon l’effet souhaité
+          const radius = 20; // ajuste ce rayon selon l'effet souhaité
           ctx.beginPath();
           ctx.moveTo(-width / 2 + radius, -height / 2);
           ctx.lineTo(width / 2 - radius, -height / 2);
@@ -291,7 +285,6 @@ const SCROLL_INTERVAL = 150; // en ms
     animationFrameRef.current = requestAnimationFrame(detect);
   };
 
-
    useEffect(() => {
     const interval = requestAnimationFrame(detect)
     return () => cancelAnimationFrame(interval);
@@ -311,7 +304,14 @@ const SCROLL_INTERVAL = 150; // en ms
 
   const handleCaptureInSlot = (slotIdx) => {
     if (filterType === 'grid') {
+      // Vérifier si la case est déjà remplie
+      if (selectedMovies[slotIdx] !== null) {
+        console.log(`Case ${slotIdx + 1} déjà remplie, action ignorée`);
+        return; // Sortir de la fonction si la case est déjà remplie
+      }
+      
       if (!isStopped) return;
+      
       const updated = [...selectedMovies];
       updated[slotIdx] = movies[currentIdx];
       setSelectedMovies(updated);
@@ -437,7 +437,7 @@ const SCROLL_INTERVAL = 150; // en ms
       scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
     }
   } else if (filterType === 'tournament') {
-    // Rien à faire ici pour l’instant
+    // Rien à faire ici pour l'instant
   }
 };
 
@@ -563,54 +563,93 @@ console.log('Jeu relancé, toutes les cases vidées');
               display: 'flex', 
               flexDirection: 'column' 
             }}>
-              {Array.from({ length: 10 }).map((_, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
-                  {/* Number on the left side */}
-                  <div style={{
-                    position: 'relative',
-                    bottom: 70,  
-                    width: '36px',
-                    height: '36px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: '10px',
-                    fontSize: '18px',
-                    fontWeight: 'bold',
-                    color: 'white',
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    borderRadius: '50%'
-                  }}>
-                    {idx + 1}
-                  </div>
-                  
-                  {/* Movie box */}
-                  <div
-                    onClick={() => handleCaptureInSlot(idx)}
-                    style={{
-                      width: '90px',
-                      height: '86px',
-                      bottom: 70,                      border: '1px solid white',
-                      borderRadius: '10px',
-                      backgroundColor: 'rgba(255,255,255,0.7)',
+              {Array.from({ length: 10 }).map((_, idx) => {
+                const isSlotFilled = selectedMovies[idx] !== null;
+                const isClickable = !isSlotFilled && isStopped;
+                
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+                    {/* Number on the left side */}
+                    <div style={{
+                      position: 'relative',
+                      bottom: 70,  
+                      width: '36px',
+                      height: '36px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      position: 'relative',
-                      cursor: isStopped ? 'pointer' : 'not-allowed',
-                      opacity: isStopped ? 1 : 0.5
-                    }}
-                  >
-                    {selectedMovies[idx] && (
-                      <img
-                        src={selectedMovies[idx]}
-                        alt={`film-${idx}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
-                      />
-                    )}
+                      marginRight: '10px',
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      borderRadius: '50%'
+                    }}>
+                      {idx + 1}
+                    </div>
+                    
+                    {/* Movie box */}
+                    <div
+                      onClick={() => isClickable ? handleCaptureInSlot(idx) : null}
+                      style={{
+                        width: '90px',
+                        height: '86px',
+                        bottom: 70,                      
+                        border: isSlotFilled 
+                          ? '2px solid #888' // Bordure moins contrastée pour les cases remplies
+                          : '2px solid white', // Bordure blanche pour les cases vides
+                        borderRadius: '10px',
+                        backgroundColor: isSlotFilled 
+                          ? 'rgba(250,250,250,0.95)' // Fond très clair pour les cases remplies
+                          : isStopped 
+                            ? 'rgba(255,255,255,0.9)' // Normal si vide et stoppé
+                            : 'rgba(255,255,255,0.6)', // Plus visible si en mouvement
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        cursor: isClickable ? 'pointer' : 'not-allowed',
+                        opacity: 1, // Opacité maximale pour toutes les cases
+                        // Ombre plus douce
+                        boxShadow: isSlotFilled 
+                          ? 'inset 0 0 5px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1)' // Ombre très légère
+                          : '0 2px 4px rgba(0,0,0,0.1)',
+                        // Désactive les événements de pointeur si la case est remplie
+                        pointerEvents: isSlotFilled ? 'none' : 'auto'
+                      }}
+                    >
+                      {selectedMovies[idx] && (
+                        <img
+                          src={selectedMovies[idx]}
+                          alt={`film-${idx}`}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover', 
+                            borderRadius: '8px',
+                            // Filtre très léger pour garder une bonne visibilité
+                            filter: isSlotFilled ? 'brightness(0.95) saturate(0.95)' : 'none'
+                          }}
+                        />
+                      )}
+                      
+                      {/* Overlay très léger pour indiquer que la case est non-cliquable */}
+                      {isSlotFilled && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: 'rgba(0,0,0,0.02)', // Overlay presque invisible
+                          borderRadius: '8px'
+                        }}>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Message en bas à gauche (Grid mode) - adapté pour 1920x1080 */}
@@ -624,7 +663,7 @@ console.log('Jeu relancé, toutes les cases vidées');
               fontSize: '18px',
               borderRadius: '5px'
             }}>
-              {isStopped ? 'Clique sur une case ou relancer' : 'Clique pour stopper'}
+              {isStopped ? 'Clique sur une case vide ou relancer' : 'Clique pour stopper'}
             </div>
 
             {/* Bouton relancer (Grid mode) - adapté pour 1920x1080 */}
