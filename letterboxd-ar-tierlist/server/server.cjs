@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
-const { extractFavorites, extractReviews, extractRatings, extractWatchlist, extractListByName } = require('./scraper.cjs');
+const { extractFavorites, extractReviews, extractRatings, extractWatchlist, extractListByName, shuffleArray } = require('./scraper.cjs');
 
 const app = express();
 
