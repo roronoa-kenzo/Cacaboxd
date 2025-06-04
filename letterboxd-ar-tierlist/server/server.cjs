@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -21,16 +20,6 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.json());
 
-// Fonction pour mélanger un tableau (Fisher-Yates shuffle)
-function shuffleArray(array) {
-    const shuffled = [...array]; // Copie pour ne pas modifier l'original
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
 app.post('/api/fetchMovies', async (req, res) => {
     console.log('Received request to /api/fetchMovies with body:', req.body);
     console.log('Request headers:', req.headers);
@@ -39,28 +28,41 @@ app.post('/api/fetchMovies', async (req, res) => {
     console.log(`Processing request for username: ${username}, listName: ${listName || 'none'}`);
 
     try {
-        let posters;
+        let posters = [];
+        
         if (listName) {
-            console.log(`Fetching list: ${listName}`);
+            // Pour les listes nommées, utiliser la pagination aléatoire
             posters = await extractListByName(username, listName);
         } else {
-            console.log('Fetching user favorites, ratings, and reviews');
-            const favorites = await extractFavorites(username);
-            console.log(`Found ${favorites.length} favorites`);
+            // Pour les données générales, récupérer depuis des pages aléatoires
+            console.log(`Début du scraping pour ${username}...`);
             
-            const ratings = await extractRatings(username);
-            console.log(`Found ${ratings.length} ratings`);
-            
-            const reviews = await extractReviews(username);
-            console.log(`Found ${reviews.length} reviews`);
+            const [favorites, ratings, reviews] = await Promise.all([
+                extractFavorites(username).catch(err => {
+                    console.log(`Pas de favoris pour ${username}:`, err.message);
+                    return [];
+                }),
+                extractRatings(username).catch(err => {
+                    console.log(`Pas de ratings pour ${username}:`, err.message);
+                    return [];
+                }),
+                extractReviews(username).catch(err => {
+                    console.log(`Pas de reviews pour ${username}:`, err.message);
+                    return [];
+                })
+            ]);
 
-            posters = [
-                ...favorites.map(f => f.poster),
-                ...ratings.map(r => r.poster),
-                ...reviews.map(r => r.poster)
-            ].filter(p => p);
+            console.log(`Résultats pour ${username}: ${favorites.length} favoris, ${ratings.length} ratings, ${reviews.length} reviews`);
+
+            // Combiner tous les posters - filtrer les posters vides
+            const allPosters = [
+                ...favorites.map(f => f.poster).filter(p => p),
+                ...ratings.map(r => r.poster).filter(p => p),
+                ...reviews.map(r => r.poster).filter(p => p)
+            ];
             
-            console.log(`Total unique posters: ${posters.length}`);
+            // Un dernier mélange pour s'assurer d'une bonne distribution
+            posters = shuffleArray(allPosters);
         }
 
         if (!posters.length) {
@@ -70,12 +72,10 @@ app.post('/api/fetchMovies', async (req, res) => {
             console.error(errorMsg);
             throw new Error(errorMsg);
         }
-
-        // Mélange aléatoire des films pour éviter les patterns chronologiques
-        const shuffledPosters = shuffleArray(posters);
         
-        console.log(`Films mélangés: ${shuffledPosters.length} films pour ${username}`);
-        res.json(shuffledPosters);
+        console.log(`Films récupérés avec pagination aléatoire: ${posters.length} films pour ${username}`);
+        res.json(posters);
+        
     } catch (err) {
         console.error('Error in /api/fetchMovies endpoint:', err);
         res.status(404).json({ error: err.message });

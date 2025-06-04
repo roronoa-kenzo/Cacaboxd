@@ -51,263 +51,266 @@ const SCROLL_INTERVAL = 150; // en ms
     loadModels();
   }, []);
 
-  // Préchargement des images pour le mode tournament
+    // Préchargement des images pour le mode tournament - version améliorée
   useEffect(() => {
-    if (filterType === 'tournament' && tournamentMovies.current && tournamentMovies.opponent) {
-      // Préchargement des images du match actuel
+    if (filterType === 'tournament') {
+      // Précharger les images actuelles du match
       if (tournamentMovies.current && !loadedImages[tournamentMovies.current]) {
         const img = new Image();
         img.src = tournamentMovies.current;
-        img.onload = () => setLoadedImages(prev => ({ ...prev, [tournamentMovies.current]: img }));
+        img.onload = () => {
+          setLoadedImages(prev => ({ ...prev, [tournamentMovies.current]: img }));
+        };
+        img.onerror = () => {
+          console.warn('Erreur chargement image:', tournamentMovies.current);
+        };
       }
       
       if (tournamentMovies.opponent && !loadedImages[tournamentMovies.opponent]) {
         const img = new Image();
         img.src = tournamentMovies.opponent;
-        img.onload = () => setLoadedImages(prev => ({ ...prev, [tournamentMovies.opponent]: img }));
+        img.onload = () => {
+          setLoadedImages(prev => ({ ...prev, [tournamentMovies.opponent]: img }));
+        };
+        img.onerror = () => {
+          console.warn('Erreur chargement image:', tournamentMovies.opponent);
+        };
       }
     }
   }, [tournamentMovies.current, tournamentMovies.opponent, filterType, loadedImages]);
 
   useEffect(() => {
-  if (filterType === 'grid' && movies[currentIdx] && !loadedImages[movies[currentIdx]]) {
-    const img = new Image();
-    img.src = movies[currentIdx];
-    img.onload = () => {
-      setLoadedImages(prev => ({ ...prev, [movies[currentIdx]]: img }));
-    };
-  }
-}, [currentIdx, filterType, movies, loadedImages]);
+    if (filterType === 'grid' && movies[currentIdx] && !loadedImages[movies[currentIdx]]) {
+      const img = new Image();
+      img.src = movies[currentIdx];
+      img.onload = () => {
+        setLoadedImages(prev => ({ ...prev, [movies[currentIdx]]: img }));
+      };
+    }
+  }, [currentIdx, filterType, movies, loadedImages]);
 
   // Fonction de défilement automatique
   const scrollLoop = (timestamp) => {
-  if (!lastScrollTimeRef.current) lastScrollTimeRef.current = timestamp;
+    if (!lastScrollTimeRef.current) lastScrollTimeRef.current = timestamp;
 
-  const elapsed = timestamp - lastScrollTimeRef.current;
-  if (elapsed >= SCROLL_INTERVAL) {
-    setCurrentIdx((prevIdx) => {
-      let nextIdx = prevIdx;
-      let tries = 0;
-      const totalMovies = movies.length;
+    const elapsed = timestamp - lastScrollTimeRef.current;
+    if (elapsed >= SCROLL_INTERVAL) {
+      setCurrentIdx((prevIdx) => {
+        let nextIdx = prevIdx;
+        let tries = 0;
+        const totalMovies = movies.length;
 
-      do {
-        nextIdx = (nextIdx + 1) % totalMovies;
-        tries++;
-      } while (selectedMovies.includes(movies[nextIdx]) && tries <= totalMovies);
+        do {
+          nextIdx = (nextIdx + 1) % totalMovies;
+          tries++;
+        } while (selectedMovies.includes(movies[nextIdx]) && tries <= totalMovies);
 
-      if (tries > totalMovies) {
-        console.log('Tous les films ont été sélectionnés');
-        return prevIdx;
-      }
+        if (tries > totalMovies) {
+          console.log('Tous les films ont été sélectionnés');
+          return prevIdx;
+        }
 
-      return nextIdx;
-    });
+        return nextIdx;
+      });
 
-    lastScrollTimeRef.current = timestamp;
-  }
+      lastScrollTimeRef.current = timestamp;
+    }
 
-  scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
-};
+    scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+  };
 
   // Effet spécifique au mode grid (défilement)
- useEffect(() => {
-  if (!movies || movies.length === 0 || filterType !== 'grid' || !hasStartedGrid) return;
+  useEffect(() => {
+    if (!movies || movies.length === 0 || filterType !== 'grid' || !hasStartedGrid) return;
 
-  scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+    scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
 
-  return () => {
-    if (scrollAnimationFrameRef.current) {
-      cancelAnimationFrame(scrollAnimationFrameRef.current);
-      scrollAnimationFrameRef.current = null;
-    }
-  };
-}, [movies, selectedMovies, filterType, hasStartedGrid]);
+    return () => {
+      if (scrollAnimationFrameRef.current) {
+        cancelAnimationFrame(scrollAnimationFrameRef.current);
+        scrollAnimationFrameRef.current = null;
+      }
+    };
+  }, [movies, selectedMovies, filterType, hasStartedGrid]);
 
   useEffect(() => {
-    
-  if (
-    !movies ||
-    movies.length === 0 ||
-    filterType !== 'tournament' ||
-    tournamentMovies.current ||
-    tournamentMovies.opponent ||
-    tournamentCompleted
-  )
-    return;
+    if (
+      !movies ||
+      movies.length === 0 ||
+      filterType !== 'tournament' ||
+      tournamentMovies.current ||
+      tournamentMovies.opponent ||
+      tournamentCompleted
+    )
+      return;
 
-  const randomIndex1 = Math.floor(Math.random() * movies.length);
-  let randomIndex2;
-  do {
-    randomIndex2 = Math.floor(Math.random() * movies.length);
-  } while (randomIndex2 === randomIndex1);
+    const randomIndex1 = Math.floor(Math.random() * movies.length);
+    let randomIndex2;
+    do {
+      randomIndex2 = Math.floor(Math.random() * movies.length);
+    } while (randomIndex2 === randomIndex1);
 
-  setTournamentMovies((prev) => ({
-    ...prev,
-    current: movies[randomIndex1],
-    opponent: movies[randomIndex2],
-  }));
-}, [movies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
+    setTournamentMovies((prev) => ({
+      ...prev,
+      current: movies[randomIndex1],
+      opponent: movies[randomIndex2],
+    }));
+  }, [movies, filterType, tournamentMovies.current, tournamentMovies.opponent, tournamentCompleted]);
 
-  
   const detect = async () => {
-    
     if (!webcamRef.current || !canvasRef.current) {
-      animationFrameRef.current = requestAnimationFrame(detect);
       return;
     }
 
     const video = webcamRef.current.video;
-    const detections = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks();
-
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-    if (!detections || !detections.landmarks) {
-      animationFrameRef.current = requestAnimationFrame(detect);
+    if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
       return;
     }
 
-    const { positions } = detections.landmarks;
-    const forehead = positions[22];
-    const leftEye = positions[36];
-    const rightEye = positions[45];
+    try {
+      const detections = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks();
 
-    const eyesVector = { x: rightEye.x - leftEye.x, y: rightEye.y - leftEye.y };
-    const eyesLength = Math.sqrt(eyesVector.x ** 2 + eyesVector.y ** 2);
-    const normalizedEyesVector = { x: eyesVector.x / eyesLength, y: eyesVector.y / eyesLength };
-    const headAngleDegrees = Math.atan2(normalizedEyesVector.y, normalizedEyesVector.x) * (180 / Math.PI);
-    const tiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
-    setHeadTiltDegree(tiltFactor);
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    // Ajoutez ce code de lissage après le calcul de tiltFactor
-    const headPositionSmoothing = 0.15; // Ajustez cette valeur selon la fluidité désirée (0.05-0.3)
-    const smoothedTiltFactor = prevTiltFactorRef.current * (1 - headPositionSmoothing) + 
-                               tiltFactor * headPositionSmoothing;
-    prevTiltFactorRef.current = smoothedTiltFactor;
-    setSmoothTiltFactor(smoothedTiltFactor);
-
-    // Utilisez smoothedTiltFactor au lieu de tiltFactor
-    setHeadTiltDegree(smoothedTiltFactor);
-
-    if (filterType === 'tournament' &&
-      !tournamentCompleted &&
-      tournamentMovies.current &&
-      tournamentMovies.opponent &&
-      Math.abs(headAngleDegrees) > SELECTION_TILT_THRESHOLD &&
-      Date.now() - lastSelectionTime.current > selectionCooldown) {
-  
-        handleSelectTournamentWinner(headAngleDegrees > 0); // gauche = current gagne
-        lastSelectionTime.current = Date.now();
+      if (!detections || !detections.landmarks) {
+        return;
       }
 
-    const scaleX = VIDEO_WIDTH / 900;
-    const scaleY = VIDEO_HEIGHT / 450;
+      const { positions } = detections.landmarks;
+      const forehead = positions[22];
+      const leftEye = positions[36];
+      const rightEye = positions[45];
 
-    if (filterType === 'grid') {
-      const img = loadedImages[movies[currentIdx]];
-      if (img) {
-        ctx.drawImage(img, VIDEO_WIDTH - forehead.x - 40 * scaleX, forehead.y - 160 * scaleY, 110 * scaleX, 140 * scaleY);
-      };
-    } else if (filterType === 'tournament') {
+      const eyesVector = { x: rightEye.x - leftEye.x, y: rightEye.y - leftEye.y };
+      const eyesLength = Math.sqrt(eyesVector.x ** 2 + eyesVector.y ** 2);
+      const normalizedEyesVector = { x: eyesVector.x / eyesLength, y: eyesVector.y / eyesLength };
+      const headAngleDegrees = Math.atan2(normalizedEyesVector.y, normalizedEyesVector.x) * (180 / Math.PI);
+      const tiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
+      setHeadTiltDegree(tiltFactor);
 
-      const { current, opponent } = tournamentMovies;
-      
+      // Lissage adaptatif selon le mode
+      const headPositionSmoothing = filterType === 'tournament' ? 0.08 : 0.15; // Moins de lissage pour tournament
+      const smoothedTiltFactor = prevTiltFactorRef.current * (1 - headPositionSmoothing) + 
+                                 tiltFactor * headPositionSmoothing;
+      prevTiltFactorRef.current = smoothedTiltFactor;
+      setSmoothTiltFactor(smoothedTiltFactor);
+      setHeadTiltDegree(smoothedTiltFactor);
 
-      if (!loadedImages[current]) {
-        const img = new Image();
-        img.src = current;
-        img.onload = () => setLoadedImages(prev => ({ ...prev, [current]: img }));
-      }
+      if (filterType === 'tournament' &&
+        !tournamentCompleted &&
+        tournamentMovies.current &&
+        tournamentMovies.opponent &&
+        Math.abs(headAngleDegrees) > SELECTION_TILT_THRESHOLD &&
+        Date.now() - lastSelectionTime.current > selectionCooldown) {
+    
+          handleSelectTournamentWinner(headAngleDegrees > 0);
+          lastSelectionTime.current = Date.now();
+        }
 
-      if (!loadedImages[opponent]) {
-        const img = new Image();
-        img.src = opponent;
-        img.onload = () => setLoadedImages(prev => ({ ...prev, [opponent]: img }));
-      }
+      const scaleX = VIDEO_WIDTH / 900;
+      const scaleY = VIDEO_HEIGHT / 450;
 
-      
-      const imgLeft = current ? loadedImages[current] : null;
-    const imgRight = opponent ? loadedImages[opponent] : null;
-      
-      if (imgLeft && imgRight) {
+      if (filterType === 'grid') {
+        const img = loadedImages[movies[currentIdx]];
+        if (img && img.complete && img.naturalHeight !== 0) {
+          ctx.drawImage(img, VIDEO_WIDTH - forehead.x - 40 * scaleX, forehead.y - 160 * scaleY, 110 * scaleX, 140 * scaleY);
+        }
+      } else if (filterType === 'tournament') {
+        const { current, opponent } = tournamentMovies;
         
-        const baseImgWidth = 110 * scaleX;
-        const baseImgHeight = 140 * scaleY;
-        const baseLeftX = forehead.x - -70 * scaleX;
-        const baseRightX = forehead.x + -130 * scaleX;
-        const baseY = forehead.y - 180 * scaleY;
+        // Vérification renforcée de l'existence des images
+        if (!current || !opponent) {
+          return;
+        }
 
-        const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor));
-        const normalizedRightTilt = Math.max(0, tiltFactor);
-        const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
-        const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
-        const leftRotation = (normalizedLeftTilt / 100) * 10;
-        const rightRotation = -(normalizedRightTilt / 100) * 10;
+        const imgLeft = loadedImages[current];
+        const imgRight = loadedImages[opponent];
+        
+        // Vérification que les images sont bien chargées et complètes
+        if (imgLeft && imgLeft.complete && imgLeft.naturalHeight !== 0 && 
+            imgRight && imgRight.complete && imgRight.naturalHeight !== 0) {
+          
+          const baseImgWidth = 110 * scaleX;
+          const baseImgHeight = 140 * scaleY;
+          const baseLeftX = forehead.x - -70 * scaleX;
+          const baseRightX = forehead.x + -130 * scaleX;
+          const baseY = forehead.y - 180 * scaleY;
 
-        const drawImageWithRotation = (img, x, y, width, height, rotation) => {
-          ctx.save();
-          ctx.translate(x + width / 2, y + height / 2);
-          ctx.rotate(rotation * Math.PI / 180);
-          // Début du masque arrondi (border-radius)
-          const radius = 20; // ajuste ce rayon selon l'effet souhaité
-          ctx.beginPath();
-          ctx.moveTo(-width / 2 + radius, -height / 2);
-          ctx.lineTo(width / 2 - radius, -height / 2);
-          ctx.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
-          ctx.lineTo(width / 2, height / 2 - radius);
-          ctx.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
-          ctx.lineTo(-width / 2 + radius, height / 2);
-          ctx.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
-          ctx.lineTo(-width / 2, -height / 2 + radius);
-          ctx.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
-          ctx.closePath();
-          ctx.clip(); // on applique le masque
-          ctx.drawImage(img, -width / 2, -height / 2, width, height);
-          ctx.restore();
-        };
+          const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor));
+          const normalizedRightTilt = Math.max(0, tiltFactor);
+          const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
+          const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
+          const leftRotation = (normalizedLeftTilt / 100) * 10;
+          const rightRotation = -(normalizedRightTilt / 100) * 10;
 
-        drawImageWithRotation(imgLeft, baseLeftX, baseY, baseImgWidth * leftScale, baseImgHeight * leftScale, leftRotation);
-        drawImageWithRotation(imgRight, baseRightX, baseY, baseImgWidth * rightScale, baseImgHeight * rightScale, rightRotation);
+          const drawImageWithRotation = (img, x, y, width, height, rotation) => {
+            ctx.save();
+            ctx.translate(x + width / 2, y + height / 2);
+            ctx.rotate(rotation * Math.PI / 180);
+            const radius = 20;
+            ctx.beginPath();
+            ctx.moveTo(-width / 2 + radius, -height / 2);
+            ctx.lineTo(width / 2 - radius, -height / 2);
+            ctx.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
+            ctx.lineTo(width / 2, height / 2 - radius);
+            ctx.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
+            ctx.lineTo(-width / 2 + radius, height / 2);
+            ctx.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
+            ctx.lineTo(-width / 2, -height / 2 + radius);
+            ctx.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(img, -width / 2, -height / 2, width, height);
+            ctx.restore();
+          };
 
-        // VS text
-        ctx.font = `${30 * scaleX}px Arial`;
-        ctx.fillStyle = 'white';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.textAlign = 'center';
-        const middle = (baseLeftX + baseImgWidth + baseRightX) / 2;
-        ctx.fillText('VS', middle, forehead.y - 90 * scaleY);
+          try {
+            drawImageWithRotation(imgLeft, baseLeftX, baseY, baseImgWidth * leftScale, baseImgHeight * leftScale, leftRotation);
+            drawImageWithRotation(imgRight, baseRightX, baseY, baseImgWidth * rightScale, baseImgHeight * rightScale, rightRotation);
+
+            // VS text
+            ctx.font = `${30 * scaleX}px Arial`;
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.textAlign = 'center';
+            const middle = (baseLeftX + baseImgWidth + baseRightX) / 2;
+            ctx.fillText('VS', middle, forehead.y - 90 * scaleY);
+          } catch (error) {
+            console.warn('Erreur dans drawImageWithRotation:', error);
+          }
+        }
       }
+    } catch (error) {
+      console.warn('Erreur dans detect:', error);
     }
-
-    animationFrameRef.current = requestAnimationFrame(detect);
   };
 
-   useEffect(() => {
-    const interval = requestAnimationFrame(detect)
-    return () => cancelAnimationFrame(interval);
+  // Utilisation d'un interval optimisé pour detect
+  useEffect(() => {
+    const interval = setInterval(detect, 16); // ~60fps
+    return () => clearInterval(interval);
   });
 
   const handleStopScrolling = () => {
     if (!isStopped && filterType === 'grid') {
-  if (scrollAnimationFrameRef.current) {
-    cancelAnimationFrame(scrollAnimationFrameRef.current);
-    scrollAnimationFrameRef.current = null;
-  }
-  setIsStopped(true);
-  console.log(`Défilement stoppé sur l'image: ${movies[currentIdx]}`);
-}
-
+      if (scrollAnimationFrameRef.current) {
+        cancelAnimationFrame(scrollAnimationFrameRef.current);
+        scrollAnimationFrameRef.current = null;
+      }
+      setIsStopped(true);
+      console.log(`Défilement stoppé sur l'image: ${movies[currentIdx]}`);
+    }
   };
 
   const handleCaptureInSlot = (slotIdx) => {
     if (filterType === 'grid') {
-      // Vérifier si la case est déjà remplie
       if (selectedMovies[slotIdx] !== null) {
         console.log(`Case ${slotIdx + 1} déjà remplie, action ignorée`);
-        return; // Sortir de la fonction si la case est déjà remplie
+        return;
       }
       
       if (!isStopped) return;
@@ -325,7 +328,6 @@ const SCROLL_INTERVAL = 150; // en ms
     const bracketCopy = [...tournamentMovies.bracket];
     const winner = isLeftWinner ? tournamentMovies.opponent : tournamentMovies.current;
     
-    // Track which phase of the tournament we're in
     const filledInitialSlots = bracketCopy.slice(0, 8).filter(slot => slot !== null).length;
     const filledQuarterFinals = bracketCopy.slice(8, 12).filter(slot => slot !== null).length;
     const filledSemiFinals = bracketCopy.slice(12, 14).filter(slot => slot !== null).length;
@@ -334,22 +336,14 @@ const SCROLL_INTERVAL = 150; // en ms
     let nextCurrent = null;
     let nextOpponent = null;
     
-    // Phase 1: Initial selection of 8 movies
     if (filledInitialSlots < 8) {
-      // Add the winner to the next available spot in first 8 positions
       const nextInitialSlot = bracketCopy.slice(0, 8).findIndex(slot => slot === null);
       if (nextInitialSlot !== -1) {
         bracketCopy[nextInitialSlot] = winner;
       }
       
-      // If we've filled less than 8 slots, continue with selection
       if (filledInitialSlots + 1 < 8) {
-        // We need more initial films for the tournament
-        const usedMovieUrls = new Set([
-          ...bracketCopy.filter(m => m !== null)
-        ]);
-        
-        // Find movies that haven't been used yet
+        const usedMovieUrls = new Set([...bracketCopy.filter(m => m !== null)]);
         const availableMovies = movies.filter(movie => !usedMovieUrls.has(movie));
         
         if (availableMovies.length >= 2) {
@@ -362,64 +356,42 @@ const SCROLL_INTERVAL = 150; // en ms
           nextCurrent = availableMovies[randomIndex1];
           nextOpponent = availableMovies[randomIndex2];
         }
-      } 
-      // If we just completed the initial 8 selections, set up the first quarter-final match
-      else if (filledInitialSlots + 1 === 8) {
+      } else if (filledInitialSlots + 1 === 8) {
         nextCurrent = bracketCopy[0];
         nextOpponent = bracketCopy[1];
       }
-    }
-    // Phase 2: Quarter-finals (4 matches)
-    else if (filledQuarterFinals < 4) {
-      // Add winner to next quarter-final slot
+    } else if (filledQuarterFinals < 4) {
       bracketCopy[8 + filledQuarterFinals] = winner;
       
-      // Set up next match based on how many quarter-finals completed
       if (filledQuarterFinals === 0) {
-        // Second quarter-final match
         nextCurrent = bracketCopy[2];
         nextOpponent = bracketCopy[3];
       } else if (filledQuarterFinals === 1) {
-        // Third quarter-final match
         nextCurrent = bracketCopy[4];
         nextOpponent = bracketCopy[5];
       } else if (filledQuarterFinals === 2) {
-        // Fourth quarter-final match
         nextCurrent = bracketCopy[6];
         nextOpponent = bracketCopy[7];
       } else if (filledQuarterFinals === 3) {
-        // All quarter-finals done, set up first semi-final
-        nextCurrent = bracketCopy[8]; // First quarter-final winner
-        nextOpponent = bracketCopy[9]; // Second quarter-final winner
+        nextCurrent = bracketCopy[8];
+        nextOpponent = bracketCopy[9];
       }
-    }
-    // Phase 3: Semi-finals (2 matches)
-    else if (filledSemiFinals < 2) {
-      // Add winner to next semi-final slot
+    } else if (filledSemiFinals < 2) {
       bracketCopy[12 + filledSemiFinals] = winner;
       
-      // Set up next match 
       if (filledSemiFinals === 0) {
-        // Second semi-final
-        nextCurrent = bracketCopy[10]; // Third quarter-final winner
-        nextOpponent = bracketCopy[11]; // Fourth quarter-final winner
+        nextCurrent = bracketCopy[10];
+        nextOpponent = bracketCopy[11];
       } else if (filledSemiFinals === 1) {
-        // All semi-finals done, set up the final
-        nextCurrent = bracketCopy[12]; // First semi-final winner
-        nextOpponent = bracketCopy[13]; // Second semi-final winner
+        nextCurrent = bracketCopy[12];
+        nextOpponent = bracketCopy[13];
       }
-    }
-    // Phase 4: Final
-    else if (!filledFinal) {
-      // Add winner to final slot
+    } else if (!filledFinal) {
       bracketCopy[14] = winner;
-      
-      // Tournament is complete, no more matches
       nextCurrent = null;
       nextOpponent = null;
     }
     
-    // Update the tournament state
     setTournamentMovies({
       current: nextCurrent,
       opponent: nextOpponent,
@@ -428,42 +400,35 @@ const SCROLL_INTERVAL = 150; // en ms
   };
 
   const handleRelancer = () => {
-  if (filterType === 'grid') {
-    setCurrentIdx(0);
-    lastScrollTimeRef.current = 0;
-    setIsStopped(false);
+    if (filterType === 'grid') {
+      setCurrentIdx(0);
+      lastScrollTimeRef.current = 0;
+      setIsStopped(false);
 
-    if (!scrollAnimationFrameRef.current) {
-      scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+      if (!scrollAnimationFrameRef.current) {
+        scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+      }
     }
-  } else if (filterType === 'tournament') {
-    // Rien à faire ici pour l'instant
-  }
-};
+  };
 
   const handleRejouer = () => {
     if (filterType === 'grid') {
       setSelectedMovies(Array(10).fill(null));
+      setIsStopped(true);
 
-// Empêche le défilement auto à la relance
-setIsStopped(true);
+      if (scrollAnimationFrameRef.current) {
+        cancelAnimationFrame(scrollAnimationFrameRef.current);
+        scrollAnimationFrameRef.current = null;
+      }
 
-// Stoppe proprement toute animation en cours
-if (scrollAnimationFrameRef.current) {
-  cancelAnimationFrame(scrollAnimationFrameRef.current);
-  scrollAnimationFrameRef.current = null;
-}
-
-console.log('Jeu relancé, toutes les cases vidées');
+      console.log('Jeu relancé, toutes les cases vidées');
     } else if (filterType === 'tournament') {
-      // Reset tournament
       setTournamentMovies({
         current: null,
         opponent: null,
         bracket: Array(15).fill(null)
       });
       
-      // Select new random movies
       const randomIndex1 = Math.floor(Math.random() * movies.length);
       let randomIndex2;
       do {
@@ -478,21 +443,25 @@ console.log('Jeu relancé, toutes les cases vidées');
     }
   };
 
+  const startScrolling = () => {
+    setHasStartedGrid(true);
+    setIsStopped(false);
+    if (!scrollAnimationFrameRef.current) {
+      scrollAnimationFrameRef.current = requestAnimationFrame(scrollLoop);
+    }
+  };
+
   const toggleFilterType = () => {
     if (filterType === 'grid') {
-      // Switch to tournament mode
       setFilterType('tournament');
-
       setIsStopped(false);
       
-      // Reset tournament state
       setTournamentMovies({
         current: null,
         opponent: null,
         bracket: Array(15).fill(null)
       });
       
-      // Select initial movies for tournament
       const randomIndex1 = Math.floor(Math.random() * movies.length);
       let randomIndex2;
       do {
@@ -505,7 +474,6 @@ console.log('Jeu relancé, toutes les cases vidées');
         opponent: movies[randomIndex2]
       }));
     } else {
-      // Switch to grid mode
       setFilterType('grid');
       setIsStopped(false);
       startScrolling();
