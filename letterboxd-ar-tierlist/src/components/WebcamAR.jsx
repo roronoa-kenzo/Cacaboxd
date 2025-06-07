@@ -19,14 +19,23 @@ export default function WebcamAR({ movies, setStep }) {
     bracket: Array(15).fill(null),
   });
   const [smoothTiltFactor, setSmoothTiltFactor] = useState(0);
-const prevTiltFactorRef = useRef(0);
+  const prevTiltFactorRef = useRef(0);
   const [headPosition, setHeadPosition] = useState('center');
   const [headTiltDegree, setHeadTiltDegree] = useState(0);
   const [loadedImages, setLoadedImages] = useState({});
 
+  // Références pour la stabilisation améliorée
+  const smoothForeheadPositionRef = useRef({ x: 0, y: 0 });
+  const prevForeheadPositionRef = useRef({ x: 0, y: 0 });
+  const isFirstDetectionRef = useRef(true);
+  
+  // Nouvelle référence pour stabiliser l'inclinaison
+  const smoothTiltHistoryRef = useRef([]);
+  const TILT_HISTORY_SIZE = 8; // Nombre de valeurs à garder pour le lissage
+
   const scrollAnimationFrameRef = useRef(null);
-const lastScrollTimeRef = useRef(0);
-const SCROLL_INTERVAL = 150; // en ms
+  const lastScrollTimeRef = useRef(0);
+  const SCROLL_INTERVAL = 150; // en ms
 
   const headPositionRef = useRef('center');
   const lastSelectionTime = useRef(0);
@@ -51,7 +60,7 @@ const SCROLL_INTERVAL = 150; // en ms
     loadModels();
   }, []);
 
-    // Préchargement des images pour le mode tournament - version améliorée
+  // Préchargement des images pour le mode tournament - version améliorée
   useEffect(() => {
     if (filterType === 'tournament') {
       // Précharger les images actuelles du match
@@ -184,21 +193,55 @@ const SCROLL_INTERVAL = 150; // en ms
       const leftEye = positions[36];
       const rightEye = positions[45];
 
+      // Stabilisation de la position du front (inchangé)
+      if (isFirstDetectionRef.current) {
+        smoothForeheadPositionRef.current = { x: forehead.x, y: forehead.y };
+        prevForeheadPositionRef.current = { x: forehead.x, y: forehead.y };
+        smoothTiltHistoryRef.current = [];
+        isFirstDetectionRef.current = false;
+      } else {
+        // Lissage très fort pour la position (stabilise le tremblement)
+        const positionSmoothing = 0.88; // Légèrement augmenté pour plus de stabilité
+        smoothForeheadPositionRef.current.x = 
+          prevForeheadPositionRef.current.x * positionSmoothing + forehead.x * (1 - positionSmoothing);
+        smoothForeheadPositionRef.current.y = 
+          prevForeheadPositionRef.current.y * positionSmoothing + forehead.y * (1 - positionSmoothing);
+        
+        prevForeheadPositionRef.current = { ...smoothForeheadPositionRef.current };
+      }
+
+      // Calcul de l'angle de tête avec stabilisation améliorée
       const eyesVector = { x: rightEye.x - leftEye.x, y: rightEye.y - leftEye.y };
       const eyesLength = Math.sqrt(eyesVector.x ** 2 + eyesVector.y ** 2);
       const normalizedEyesVector = { x: eyesVector.x / eyesLength, y: eyesVector.y / eyesLength };
       const headAngleDegrees = Math.atan2(normalizedEyesVector.y, normalizedEyesVector.x) * (180 / Math.PI);
-      const tiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
-      setHeadTiltDegree(tiltFactor);
+      const rawTiltFactor = Math.max(-100, Math.min(100, headAngleDegrees * 5));
 
-      // Lissage adaptatif selon le mode
-      const headPositionSmoothing = filterType === 'tournament' ? 0.08 : 0.15; // Moins de lissage pour tournament
-      const smoothedTiltFactor = prevTiltFactorRef.current * (1 - headPositionSmoothing) + 
-                                 tiltFactor * headPositionSmoothing;
-      prevTiltFactorRef.current = smoothedTiltFactor;
-      setSmoothTiltFactor(smoothedTiltFactor);
-      setHeadTiltDegree(smoothedTiltFactor);
+      // Nouveau système de lissage par moyenne mobile pour l'inclinaison
+      smoothTiltHistoryRef.current.push(rawTiltFactor);
+      if (smoothTiltHistoryRef.current.length > TILT_HISTORY_SIZE) {
+        smoothTiltHistoryRef.current.shift();
+      }
 
+      // Calcul de la moyenne pondérée (plus de poids sur les valeurs récentes)
+      let weightedSum = 0;
+      let totalWeight = 0;
+      for (let i = 0; i < smoothTiltHistoryRef.current.length; i++) {
+        const weight = (i + 1) / smoothTiltHistoryRef.current.length; // Poids croissant
+        weightedSum += smoothTiltHistoryRef.current[i] * weight;
+        totalWeight += weight;
+      }
+      
+      const smoothedTiltFactor = totalWeight > 0 ? weightedSum / totalWeight : rawTiltFactor;
+      
+      // Application d'un lissage final plus doux
+      const finalTiltFactor = prevTiltFactorRef.current * 0.75 + smoothedTiltFactor * 0.25;
+      prevTiltFactorRef.current = finalTiltFactor;
+      
+      setSmoothTiltFactor(finalTiltFactor);
+      setHeadTiltDegree(finalTiltFactor);
+
+      // Détection pour le mode tournament (utilise l'angle brut pour la réactivité)
       if (filterType === 'tournament' &&
         !tournamentCompleted &&
         tournamentMovies.current &&
@@ -213,10 +256,19 @@ const SCROLL_INTERVAL = 150; // en ms
       const scaleX = VIDEO_WIDTH / 900;
       const scaleY = VIDEO_HEIGHT / 450;
 
+      // Utilisation de la position stabilisée pour l'affichage
+      const stabilizedForehead = smoothForeheadPositionRef.current;
+
       if (filterType === 'grid') {
         const img = loadedImages[movies[currentIdx]];
         if (img && img.complete && img.naturalHeight !== 0) {
-          ctx.drawImage(img, VIDEO_WIDTH - forehead.x - 40 * scaleX, forehead.y - 160 * scaleY, 110 * scaleX, 140 * scaleY);
+          ctx.drawImage(
+            img, 
+            VIDEO_WIDTH - stabilizedForehead.x - 40 * scaleX, 
+            stabilizedForehead.y - 160 * scaleY, 
+            110 * scaleX, 
+            140 * scaleY
+          );
         }
       } else if (filterType === 'tournament') {
         const { current, opponent } = tournamentMovies;
@@ -235,12 +287,14 @@ const SCROLL_INTERVAL = 150; // en ms
           
           const baseImgWidth = 110 * scaleX;
           const baseImgHeight = 140 * scaleY;
-          const baseLeftX = forehead.x - -70 * scaleX;
-          const baseRightX = forehead.x + -130 * scaleX;
-          const baseY = forehead.y - 180 * scaleY;
+          // Utilisation de la position stabilisée
+          const baseLeftX = stabilizedForehead.x - -70 * scaleX;
+          const baseRightX = stabilizedForehead.x + -130 * scaleX;
+          const baseY = stabilizedForehead.y - 180 * scaleY;
 
-          const normalizedLeftTilt = Math.abs(Math.min(0, tiltFactor));
-          const normalizedRightTilt = Math.max(0, tiltFactor);
+          // Utilisation du facteur d'inclinaison stabilisé
+          const normalizedLeftTilt = Math.abs(Math.min(0, finalTiltFactor));
+          const normalizedRightTilt = Math.max(0, finalTiltFactor);
           const leftScale = 1.0 + (normalizedLeftTilt / 100) * 0.2;
           const rightScale = 1.0 + (normalizedRightTilt / 100) * 0.2;
           const leftRotation = (normalizedLeftTilt / 100) * 10;
@@ -278,7 +332,7 @@ const SCROLL_INTERVAL = 150; // en ms
             ctx.lineWidth = 2;
             ctx.textAlign = 'center';
             const middle = (baseLeftX + baseImgWidth + baseRightX) / 2;
-            ctx.fillText('VS', middle, forehead.y - 90 * scaleY);
+            ctx.fillText('VS', middle, stabilizedForehead.y - 90 * scaleY);
           } catch (error) {
             console.warn('Erreur dans drawImageWithRotation:', error);
           }
@@ -411,10 +465,13 @@ const SCROLL_INTERVAL = 150; // en ms
     }
   };
 
-  const handleRejouer = () => {
+    const handleRejouer = () => {
     if (filterType === 'grid') {
       setSelectedMovies(Array(10).fill(null));
-      setIsStopped(true);
+      setCurrentIdx(Math.floor(Math.random() * movies.length)); // Index aléatoire
+      setIsStopped(false);
+      setHasStartedGrid(false); // Retour à l'état initial, pas encore commencé
+      lastScrollTimeRef.current = 0;
 
       if (scrollAnimationFrameRef.current) {
         cancelAnimationFrame(scrollAnimationFrameRef.current);
@@ -452,6 +509,11 @@ const SCROLL_INTERVAL = 150; // en ms
   };
 
   const toggleFilterType = () => {
+    // Réinitialiser complètement la stabilisation lors du changement de mode
+    isFirstDetectionRef.current = true;
+    smoothTiltHistoryRef.current = [];
+    prevTiltFactorRef.current = 0;
+    
     if (filterType === 'grid') {
       setFilterType('tournament');
       setIsStopped(false);
